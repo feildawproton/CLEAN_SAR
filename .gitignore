@@ -1,0 +1,23 @@
+# Output directories and data
+output/
+*.nitf
+*.png
+*.npy
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Packaging and environments
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*~

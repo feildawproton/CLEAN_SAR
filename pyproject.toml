@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clean_sar"
+version = "0.1.0"
+description = "Complex SAR Hogbom CLEAN Deconvolution with Spatially-Varying IPR for NITF SICDs"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "torch",
+    "sarkit",
+    "matplotlib",
+    "lxml",
+]
+
+[project.scripts]
+clean-sar = "clean_sar.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["clean_sar*"]
