@@ -83,3 +83,27 @@ def test_sicd_handler_write_nitf():
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+def test_sicd_handler_write_nitf_no_mutation():
+    """Verify Finding 3: write_nitf does not mutate handler's self.xmltree in-place."""
+    file_path = get_test_sicd()
+    handler = SICDHandler(file_path)
+    orig_rows = handler.num_rows
+    orig_cols = handler.num_cols
+
+    chip = np.zeros((32, 32), dtype=np.complex64)
+    with tempfile.NamedTemporaryFile(suffix=".nitf", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        # Write without custom_xmltree (should deepcopy internally)
+        handler.write_nitf(tmp_path, chip, custom_xmltree=None)
+        # Original handler's XML NumRows/NumCols must be unchanged
+        xh = handler.xh
+        assert int(xh.load("./{*}ImageData/{*}NumRows")) == orig_rows
+        assert int(xh.load("./{*}ImageData/{*}NumCols")) == orig_cols
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+

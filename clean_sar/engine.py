@@ -37,6 +37,7 @@ def run_hogbom_clean(
     max_iters: int = 2500,
     chip_origin: Optional[Tuple[int, int]] = None,
     clean_mask: Optional[Union[np.ndarray, torch.Tensor]] = None,
+    guard_margin: int = 0,
     device: Optional[Union[str, torch.device]] = None,
     verbose: bool = False,
 ) -> CleanResult:
@@ -66,6 +67,8 @@ def run_hogbom_clean(
         Global coordinates of the top-left corner of dirty_image.
     clean_mask : np.ndarray or torch.Tensor, optional
         Binary mask (H, W) constraining search region for point components.
+    guard_margin : int, optional
+        Border margin in pixels excluded from peak selection (default: 0).
     device : str or torch.device, optional
         Target device ('cuda' or 'cpu'). If None, GPU is used if available.
     verbose : bool
@@ -85,6 +88,7 @@ def run_hogbom_clean(
 
     # Convert image to torch tensor on device in native byte order
     img_t = _to_native_complex64(dirty_image, device)
+    H, W = img_t.shape
 
     if clean_mask is not None:
         if isinstance(clean_mask, np.ndarray):
@@ -94,6 +98,11 @@ def run_hogbom_clean(
             mask_t = clean_mask.to(device=device, dtype=torch.bool)
     else:
         mask_t = None
+
+    if guard_margin > 0 and guard_margin < min(H // 2, W // 2):
+        guard_mask = torch.zeros((H, W), dtype=torch.bool, device=device)
+        guard_mask[guard_margin : H - guard_margin, guard_margin : W - guard_margin] = True
+        mask_t = (mask_t & guard_mask) if mask_t is not None else guard_mask
 
     H, W = img_t.shape
     if psf_size % 2 == 0:

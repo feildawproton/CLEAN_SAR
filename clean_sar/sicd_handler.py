@@ -1,4 +1,5 @@
 import os
+import copy
 import lxml.etree as etree
 import numpy as np
 from typing import Optional, Tuple, Dict, Any, Union
@@ -63,6 +64,9 @@ class SICDHandler:
         # Weighting window info
         self.row_wgt_name = self._safe_load("./{*}Grid/{*}Row/{*}WgtType/{*}WindowName", None)
         self.col_wgt_name = self._safe_load("./{*}Grid/{*}Col/{*}WgtType/{*}WindowName", None)
+
+        # Slant range to SCP (meters) from SCPCOA
+        self.scp_slant_range = float(self._safe_load("./{*}SCPCOA/{*}SlantRange", 10000.0))
 
         # PFA metadata (if available)
         self.is_pfa = self.xmltree.find("{*}PFA") is not None
@@ -202,7 +206,7 @@ class SICDHandler:
             SICD XML tree describing the image (e.g. from chip reading). If None, uses original full metadata.
         """
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-        xml = custom_xmltree if custom_xmltree is not None else self.xmltree
+        xml = copy.deepcopy(custom_xmltree if custom_xmltree is not None else self.xmltree)
 
         # Ensure XML image dimensions match the array
         xh = ss.XmlHelper(xml)

@@ -148,6 +148,7 @@ def plot_clean_comparison(
     dyn_range_db: float = 50.0,
     psf_dirty: Optional[np.ndarray] = None,
     psf_clean: Optional[np.ndarray] = None,
+    ref_val: Optional[float] = None,
 ):
     """
     Generates and saves a multi-panel comparison figure showing:
@@ -157,7 +158,8 @@ def plot_clean_comparison(
     4. Residual Image (dB)
     5. (Optional) Dirty and Clean PSF profiles/insets.
     """
-    ref_val = np.max(np.abs(dirty_image))
+    if ref_val is None:
+        ref_val = float(np.max(np.abs(dirty_image)))
 
     dirty_db = db_scale(dirty_image, dyn_range_db=dyn_range_db, ref_val=ref_val)
     clean_db = db_scale(clean_image, dyn_range_db=dyn_range_db, ref_val=ref_val)

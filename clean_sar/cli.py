@@ -41,8 +41,10 @@ def parse_args():
     )
     parser.add_argument("--max-iters", type=int, default=2500, help="Maximum CLEAN iterations (default: 2500).")
     parser.add_argument("--psf-size", type=int, default=65, help="Kernel size for local PSF (default: 65).")
+    parser.add_argument("--guard-margin", type=int, default=0, help="Border margin in pixels excluded from peak selection (default: 0).")
     parser.add_argument("--device", default=None, help="Computation device: 'cuda' or 'cpu' (default: auto).")
     parser.add_argument("--dyn-range", type=float, default=50.0, help="Dynamic range in dB for plotting (default: 50.0).")
+    parser.add_argument("--ref-val", type=float, default=None, help="Reference magnitude for 0 dB scale normalization in plot.")
     return parser.parse_args()
 
 
@@ -94,6 +96,7 @@ def main():
         threshold=args.threshold,
         max_iters=args.max_iters,
         chip_origin=chip_origin,
+        guard_margin=args.guard_margin,
         device=args.device,
         verbose=True,
     )
@@ -127,6 +130,7 @@ def main():
         dyn_range_db=args.dyn_range,
         psf_dirty=ref_dirty,
         psf_clean=ref_clean,
+        ref_val=args.ref_val,
     )
     print("[+] All done successfully!")
 
