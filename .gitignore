@@ -21,3 +21,7 @@ dist/
 .idea/
 *.swp
 *~
+
+# private
+PI/
+audit/
