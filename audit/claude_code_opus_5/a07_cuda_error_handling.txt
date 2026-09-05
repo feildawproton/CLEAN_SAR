@@ -1,0 +1,38 @@
+======================================================================================
+(1) ARE CUDA API FAILURES DETECTED?
+======================================================================================
+   GPU memory: free=6.95 GiB  total=8.00 GiB
+   cuMemAlloc_v2(64 GiB) -> return code 2 (FAILURE), device ptr = None
+   cuda_backend.py ignores this return code entirely (no 'if ... != 0' on any cuMemAlloc call).
+   cuMemcpyDtoH_v2 from the NULL pointer -> return code 1 (FAILURE) -- also unchecked
+   host buffer now contains uninitialised memory, e.g. [3.1967064e-11+0.j 0.0000000e+00+0.j 3.2856828e-11+0.j]
+   -> a failed run returns a plausible-looking array and a healthy suppression_db.
+
+   Size arguments are passed without argtypes. Checking >2GiB behaviour:
+     cuMemAlloc_v2(ptr, 3*2**30) as bare int -> rc=2, ptr=None
+
+======================================================================================
+(2) LARGEST BENCHMARKED SCENE (72 Mpix): ARE THE CUDA RESULTS REAL?
+======================================================================================
+   2023-07-30-17-19-39_UMBRA-05_SICD.nitf  (5580, 12897) = 72.0 Mpix, 0.54 GiB per buffer x4, read in 1.2s
+   pytorch: iters=200 suppr=12.9606 dB  h2d=527 compute=2232 d2h=2843 ms
+   GPU free after pytorch run: 3.30 GiB (torch caching allocator still holds its pool)
+   cuda   : iters=200 suppr=12.9606 dB  h2d=267 compute=562 d2h=3456 ms
+
+   VALIDATING the CUDA arrays are real numbers and not uninitialised memory:
+     clean_image     : all-finite=True  max|torch-cuda|/peak=1.169e-07  relL2=5.727e-08
+     residual_image  : all-finite=True  max|torch-cuda|/peak=3.587e-07  relL2=5.609e-08
+     components_map  : all-finite=True  max|torch-cuda|/peak=1.872e-07  relL2=1.013e-07
+     restored_model  : all-finite=True  max|torch-cuda|/peak=1.423e-07  relL2=1.047e-07
+   suppression_db delta = 0.000000 dB
+   peak selection agreement: 200/200
+
+======================================================================================
+(3) config=None: pytorch RAISES, cuda SILENTLY SUBSTITUTES PLACEHOLDER PHYSICS
+======================================================================================
+   backend=pytorch : raised ValueError: Either 'config' (CleanPhysicsConfig) or 'psf_generator' must be provided.
+   backend=cuda    : NO ERROR. iterations=100, suppression=0.70 dB <-- computed with row_ss=0.5, col_ss=0.5, row_bw=1.5, col_bw=1.5, sigma=0.5 placeholders
+
+   The placeholder values are hardcoded in cuda_backend.py lines 205-208 and
+   273-276 as the ' if config else <default>' branch. They are not the
+   scene's physics, so the run produces a confidently-wrong deconvolution.

@@ -1,0 +1,22 @@
+resolve_backend('auto') -> 'cuda'   (so 'auto' is the CUDA path on this machine)
+
+======================================================================================
+(1) DOES beam_type='mainlobe' DO ANYTHING ON THE CUDA BACKEND?
+======================================================================================
+   backend=pytorch : max|restored(gaussian) - restored(mainlobe)| = 8.331595e-01  (26.504% of peak)   (beam types differ)
+   backend=cuda    : max|restored(gaussian) - restored(mainlobe)| = 0.000000e+00  (0.000% of peak)   <-- IDENTICAL: mainlobe silently ignored
+
+   verbose log line printed by the CUDA backend when mainlobe is requested:
+   ^ it reports 'Beam: MAINLOBE' while evaluating the Gaussian beam.
+
+======================================================================================
+(2) DOES A CUSTOM psf_generator REACH THE CUDA BACKEND?
+======================================================================================
+   backend=pytorch : RuntimeError: CUDA driver error: invalid resource handle
+              ^ CUDA driver context conflict, not a psf_generator issue;
+                isolated separately in a09_context_conflict.py (S6 vs S7).
+   backend=cuda    : custom generator called    0 times, suppression=27.40 dB  <-- generator IGNORED
+
+   (The psf_generator result for the CUDA backend is established by inspection:
+    run_hogbom_cuda_native accepts psf_generator at cuda_backend.py:139 and never
+    references it again anywhere in the function body.)

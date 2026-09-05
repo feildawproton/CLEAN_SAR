@@ -1,0 +1,64 @@
+========================================================================================
+E1  torch's context vs cuDevicePrimaryCtxRetain
+========================================================================================
+   torch current context      = 0x24427610
+   cuDevicePrimaryCtxRetain   = 0x24427610
+   SAME CONTEXT: True
+   exit 0
+
+========================================================================================
+E2  cuCtxCreate_v2 makes a second context; memory cost
+========================================================================================
+   torch context   = 0x49c38b0
+   created context = 0xb7a0790
+   SAME CONTEXT: False
+   device free memory before/after 2nd context: 7094 / 6960 MiB (cost 134 MiB)
+   exit 0
+
+========================================================================================
+E3  cost of establishing a context
+========================================================================================
+   cuDevicePrimaryCtxRetain :    0.080 ms
+   cuCtxCreate_v2           :  289.707 ms
+   cuCtxDestroy_v2          :   94.890 ms
+   -> create+destroy per run would add 384.6 ms of setup
+   exit 0
+
+========================================================================================
+E4  DANGER: resetting the primary context under a live PyTorch
+========================================================================================
+   torch tensor allocated OK
+   primary context reset
+   torch still works: 1.8531055597023366e+33
+   exit 0
+
+========================================================================================
+E5  FIX A: retain the primary context (probe->torch->cuda->torch)
+========================================================================================
+   probe -> True
+   pytorch OK (14.01 dB)
+   cuda OK (0.00 dB)
+   !                          ^^^^^^^^^^^^^^^^^^^
+   ! RuntimeError: CUDA driver error: invalid resource handle
+   exit 1  <-- FAILED
+
+========================================================================================
+E6  FIX B: own context, but restore the caller's after each run
+========================================================================================
+   probe -> True
+   pytorch OK (14.01 dB)
+   cuda OK (14.01 dB)
+   !                          ^^^^^^^^^^^^^^^^^^^
+   ! RuntimeError: CUDA driver error: invalid resource handle
+   exit 1  <-- FAILED
+
+========================================================================================
+E7  create + destroy a private context per run, then use torch
+========================================================================================
+   probe -> True
+   pytorch OK (14.01 dB)
+   private context 0xf9aa190 created and current
+   private context destroyed; current context is now 0x91b2500
+   pytorch OK (14.01 dB)
+   exit 0
+

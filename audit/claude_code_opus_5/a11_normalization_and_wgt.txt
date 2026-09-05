@@ -1,0 +1,48 @@
+====================================================================================
+(A) WHICH NORMALISATION IS CORRECT? Synthetic ground truth, HAMMING weighting
+====================================================================================
+  synthetic scene: 3 point targets, Hamming weighting, no noise
+  each target's peak pixel equals its true complex amplitude
+
+  backend        target         true amp              recovered     ratio
+  ---------- ---------- ---------------- ---------------------- ---------
+  pytorch      (40, 45)           (1+0j)        +0.9990-0.0000j    0.999x
+  pytorch      (64, 64)       (0.6-0.3j)        +0.5991-0.2996j    0.999x
+  pytorch      (90, 85)      (0.35+0.2j)        +0.3491+0.1995j    0.998x
+  pytorch         TOTAL           2.0739                 2.0710    0.999x   iters=185
+
+  cuda         (40, 45)           (1+0j)        +3.4260-0.0000j    3.426x
+  cuda         (64, 64)       (0.6-0.3j)        +2.0546-1.0273j    3.424x
+  cuda         (90, 85)      (0.35+0.2j)        +1.1973+0.6842j    3.421x
+  cuda            TOTAL           2.0739                 7.1021    3.424x   iters=657
+
+  Interpretation: a ratio of 1.000x means the recovered scatterer amplitude
+  equals the truth. Whichever backend deviates has the wrong normalisation --
+  this is a correctness question, not a consistency question.
+
+====================================================================================
+(B) RECOVERING THE WEIGHTING WHEN WgtType IS ABSENT
+====================================================================================
+  Window identification constant k = ImpRespWid * ImpRespBW:
+     UNIFORM                  k = 0.886
+     TAYLOR(nbar4,-30dB)      k = 1.125
+     HAMMING                  k = 1.303
+     HANN                     k = 1.441
+
+  file                                           WgtType  WgtFunct   k_row   k_col   implied
+  -------------------------------------------- --------- --------- ------- ------- ---------
+  2023-07-30-17-19-39_UMBRA-05_SICD.nitf            None    absent  0.8857  0.8857   UNIFORM
+  2023-09-11-10-37-05_UMBRA-05_SICD.nitf            None    absent  0.8857  0.8857   UNIFORM
+  2023-09-13-21-18-21_UMBRA-06_SICD.nitf            None    absent  0.8857  0.8857   UNIFORM
+  2023-10-04-02-03-26_UMBRA-04_SICD.nitf            None    absent  0.8857  0.8857   UNIFORM
+  2023-11-14-03-38-20_UMBRA-04_SICD.nitf            None    absent  0.8857  0.8857   UNIFORM
+  2025-10-26-05-00-15_UMBRA-08_SICD.nitf         UNIFORM    absent  0.8859  0.8859   UNIFORM
+  2023-07-30-17-19-39_UMBRA-05_SICDU_X_X.nitf       None    absent  1.0000  1.0000   UNIFORM
+  2023-09-11-10-37-05_UMBRA-05_SICDU_X_X.nitf       None    absent  1.0000  1.0000   UNIFORM
+  2023-09-13-21-18-21_UMBRA-06_SICDU_X_X.nitf       None    absent  1.0000  1.0000   UNIFORM
+  2023-10-04-02-03-26_UMBRA-04_SICDU_X_X.nitf       None    absent  1.0000  1.0000   UNIFORM
+  2023-11-14-03-38-20_UMBRA-04_SICDU_X_X.nitf       None    absent  1.0000  1.0000   UNIFORM
+  2025-10-26-05-00-15_UMBRA-08_SICDU_V_V.nitf       None    absent  1.0000  1.0000   UNIFORM
+
+  A cross-check (declared window vs. k implied by ImpRespWid*ImpRespBW) is
+  strictly stronger than requiring WgtType, and works on files that omit it.

@@ -1,0 +1,92 @@
+==============================================================================================
+X1  BUG-05: is ImageData.FirstRow / FirstCol ignored when building the config?
+==============================================================================================
+  CleanPhysicsConfig.from_sicd_handler takes chip_start=(0,0) by default and
+  never reads handler.first_row / first_col. Checking the 12 datasets:
+
+  file                                            FirstRow  FirstCol
+  ---------------------------------------------- --------- ---------
+  2023-07-30-17-19-39_UMBRA-05_SICD.nitf                 0         0
+  2023-09-11-10-37-05_UMBRA-05_SICD.nitf                 0         0
+  2023-09-13-21-18-21_UMBRA-06_SICD.nitf                 0         0
+  2023-10-04-02-03-26_UMBRA-04_SICD.nitf                 0         0
+  2023-11-14-03-38-20_UMBRA-04_SICD.nitf                 0         0
+  2025-10-26-05-00-15_UMBRA-08_SICD.nitf                 0         0
+  2023-07-30-17-19-39_UMBRA-05_SICDU_X_X.nitf            0         0
+  2023-09-11-10-37-05_UMBRA-05_SICDU_X_X.nitf            0         0
+  2023-09-13-21-18-21_UMBRA-06_SICDU_X_X.nitf            0         0
+  2023-10-04-02-03-26_UMBRA-04_SICDU_X_X.nitf            0         0
+  2023-11-14-03-38-20_UMBRA-04_SICDU_X_X.nitf            0         0
+  2025-10-26-05-00-15_UMBRA-08_SICDU_V_V.nitf            0         0
+
+  files with non-zero FirstRow/FirstCol: 0 of 12
+
+  Magnitude of the defect if a pre-chipped SICD were processed with
+  chip_bounds=None (so chip_start defaults to (0,0)):
+    FirstRow/Col = (1932,3931): computed (  -1335.8,  -2650.8) m vs correct (   -407.5,  -1030.7) m  -> error (   928.3,  1620.1) m
+    FirstRow/Col = (5000,5000): computed (  -1335.8,  -2650.8) m vs correct (   1066.7,   -590.2) m  -> error (  2402.5,  2060.6) m
+
+  CONFIRMED as a latent defect: no shipped dataset has FirstRow != 0, so it
+  is not active today, but a chip written by write_nitf and re-read would hit it.
+
+==============================================================================================
+X2  BUG-06: NVRTC architecture hardcoded
+==============================================================================================
+  cuda_backend.py: opts = [b"--std=c++14", b"--gpu-architecture=compute_86"]
+  this device reports compute capability 8.6 -> correct flag would be compute_86
+  the device capability is queryable in 3 lines but is never queried.
+
+  PTX target         compiles     loads on this sm_86 device
+  ---------------- ---------- ------------------------------
+  compute_70              yes                            yes
+  compute_80              yes                            yes
+  compute_86              yes                            yes
+  compute_90              yes             NO (driver rc=218)
+
+  PTX is forward-compatible: compute_86 PTX JITs onto NEWER devices, so an
+  H100 (sm_90) would in fact work. It is OLDER targets that fail -- A100
+  (sm_80), T4 (sm_75), V100 (sm_70) cannot load compute_86 PTX.
+  CONFIRMED as a real portability defect, with that one correction to scope.
+
+==============================================================================================
+X3  BUG-07: are device allocations protected against an exception mid-loop?
+==============================================================================================
+  'try:' occurrences in run_hogbom_cuda_native  : 0
+  'finally:' occurrences                        : 0
+  cuMemFree_v2 calls                            : 8
+  The 8 cuMemFree_v2 calls sit on the straight-line path after the loop, so any
+  exception raised inside the loop leaks every device buffer for the life of
+  the process. CONFIRMED.
+  Note this compounds with F8: once return codes ARE checked and calls raise,
+  the leak becomes reachable on any CUDA error, not just on a Python bug.
+
+==============================================================================================
+X4  is ImageCreation provenance updated when writing a deconvolved product?
+==============================================================================================
+  field            input product                      written product                   
+  ---------------- ---------------------------------- ----------------------------------
+  Application      Valkyrie Systems Sage | Umbra Ima  Valkyrie Systems Sage | Umbra Ima 
+  DateTime         2023-07-31 06:54:58.938920+00:00   2023-07-31 06:54:58.938920+00:00  
+  Site             <absent>                           <absent>                          
+  Profile          <absent>                           <absent>                          
+
+  FirstRow/FirstCol written: 1000, 1000 (chip was read from global 1000,1000)
+  NumRows/NumCols written  : 128 x 128
+
+  CONFIRMED: ImageCreation is carried over unchanged, so a deconvolved
+  product still claims the original image-formation software and timestamp.
+
+==============================================================================================
+X5  precise failure mode of demo_clean.py (the two audits describe it differently)
+==============================================================================================
+  stdout: [+] CLEAN pipeline complete in 0.78s (3 iterations, 1.2 dB suppression)
+  stdout: [*] Deconvolution completed in 0.013s (3 iterations)
+  stdout: [*] Rendering diagnostic comparison plot: audit/claude_code_opus_5/demo_out/x5/2023-11-14-03-38-20_UMBRA-04_SICD_comparison.png
+  stderr: TypeError: plot_comparison() got an unexpected keyword argument 'chip_bounds'
+
+  The other audit reports it 'fails immediately upon execution' with
+  "TypeError: bad operand type for abs(): 'str'". Measured here, the
+  deconvolution and the NITF write BOTH complete first, and the error is the
+  keyword mismatch, raised at call time before plot_comparison's body runs --
+  so abs() is never reached. Same root cause, different triage: the compute
+  is not lost, only the figure.

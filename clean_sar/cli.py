@@ -1,11 +1,7 @@
 import os
 import argparse
-import numpy as np
-import torch
-from .sicd_handler import SICDHandler
-from .psf import PSFGenerator
-from .engine import run_hogbom_clean
-from .utils import plot_clean_comparison
+from typing import Optional, Tuple
+from .processor import CLEANProcessor
 
 
 def parse_args():
@@ -14,17 +10,17 @@ def parse_args():
     )
     parser.add_argument("-i", "--input", required=True, help="Path to input NITF SICD file.")
     parser.add_argument("-o", "--output", default=None, help="Path to output deconvolved NITF SICD file.")
-    parser.add_argument("--plot", default=None, help="Path to output comparison PNG plot.")
+    parser.add_argument("--plot", default=None, help="Optional path to output comparison PNG plot.")
     parser.add_argument(
         "--chip",
         default=None,
         help="Optional ROI bounding box as 'start_row,start_col,stop_row,stop_col' (e.g. '500,500,1012,1012').",
     )
     parser.add_argument(
-        "--method",
-        choices=["kspace", "analytic"],
-        default="kspace",
-        help="Exact PSF generation method: 'kspace' (Option A: 2D Aperture + IFFT) or 'analytic' (Option B: Spatial Sinc).",
+        "--backend",
+        choices=["auto", "pytorch", "cuda"],
+        default="auto",
+        help="Compute backend: 'auto' (default), 'pytorch', or 'cuda'.",
     )
     parser.add_argument(
         "--beam",
@@ -57,82 +53,64 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     out_nitf = args.output or os.path.join(out_dir, f"{base_name}_clean.nitf")
-    out_plot = args.plot or os.path.join(out_dir, f"{base_name}_comparison.png")
+
+    chip_bounds = None
+    if args.chip:
+        coords = [int(c.strip()) for c in args.chip.split(",")]
+        chip_bounds = (coords[0], coords[1], coords[2], coords[3])
 
     print("=" * 70)
     print("  CLEAN_SAR: Complex SAR Hogbom CLEAN Deconvolution")
-    print("  (Exact Spatially-Varying PSF Computed Per Peak Position)")
-    print(f"  Input: {input_path}")
-    print(f"  Method: {args.method.upper()} | Beam: {args.beam.upper()} | PSF Size: {args.psf_size}x{args.psf_size}")
-    print(f"  Gain: {args.gain} | Threshold: {args.threshold} | Max Iters: {args.max_iters}")
+    print(f"  Input:   {input_path}")
+    print(f"  Output:  {out_nitf}")
+    if chip_bounds:
+        print(f"  Chip:    rows [{chip_bounds[0]}:{chip_bounds[2]}], cols [{chip_bounds[1]}:{chip_bounds[3]}]")
+    else:
+        print("  Target:  Full Scene")
+    print(f"  Backend: {args.backend.upper()} | Device: {args.device or 'auto'}")
+    print(f"  Beam:    {args.beam.upper()} | PSF Size: {args.psf_size}x{args.psf_size}")
+    print(f"  Gain:    {args.gain} | Threshold: {args.threshold} | Max Iters: {args.max_iters}")
     print("=" * 70)
 
-    handler = SICDHandler(input_path)
-    psf_gen = PSFGenerator(handler)
+    processor = CLEANProcessor(
+        input_path=input_path,
+        output_path=out_nitf,
+        chip_bounds=chip_bounds,
+        backend=args.backend,
+        device=args.device,
+    )
 
-    chip_origin = None
-    custom_xml = None
-
-    if args.chip:
-        coords = [int(c.strip()) for c in args.chip.split(",")]
-        r_start, c_start, r_stop, c_stop = coords
-        print(f"[*] Reading chip region: rows [{r_start}:{r_stop}], cols [{c_start}:{c_stop}]...")
-        dirty_img, custom_xml = handler.read_chip(r_start, c_start, r_stop, c_stop)
-        chip_origin = (r_start, c_start)
-    else:
-        print(f"[*] Reading full image ({handler.num_rows}x{handler.num_cols})...")
-        dirty_img = handler.read_full_image()
-
-    H, W = dirty_img.shape
-    print(f"[*] Target image shape: {H}x{W} (Peak magnitude: {np.max(np.abs(dirty_img)):.4e})")
-
-    res = run_hogbom_clean(
-        dirty_image=dirty_img,
-        psf_generator=psf_gen,
-        method=args.method,
-        beam_type=args.beam,
-        psf_size=args.psf_size,
+    result = processor.run(
         gain=args.gain,
         threshold=args.threshold,
         max_iters=args.max_iters,
-        chip_origin=chip_origin,
+        beam_type=args.beam,
+        psf_size=args.psf_size,
         guard_margin=args.guard_margin,
-        device=args.device,
         verbose=True,
     )
 
-    print(f"[+] CLEAN finished in {res.execution_time_sec:.2f}s (Iterations: {res.iterations})")
-    print(f"    Initial peak: {np.max(np.abs(dirty_img)):.4e}")
-    print(f"    Final residual peak: {np.max(np.abs(res.residual_image)):.4e}")
-    print(f"    Extracted point scatterers: {np.count_nonzero(np.abs(res.components_map) > 0)}")
+    if args.plot:
+        try:
+            from tools.compare_sicd import plot_comparison
+            # Read dirty chip / image for comparison plot
+            if chip_bounds:
+                dirty_img, _ = processor.handler.read_chip(*chip_bounds)
+            else:
+                dirty_img = processor.handler.read_full_image()
 
-    # Write output NITF SICD
-    print(f"[*] Saving deconvolved SICD NITF to: {out_nitf}")
-    handler.write_nitf(out_nitf, res.clean_image, custom_xmltree=custom_xml)
-
-    # Reference PSF for plot
-    mid_r, mid_c = H // 2, W // 2
-    if args.method == "kspace":
-        ref_dirty = psf_gen.compute_psf_kspace(mid_r, mid_c, psf_size=args.psf_size, chip_origin=chip_origin)
-    else:
-        ref_dirty = psf_gen.compute_psf_analytic(mid_r, mid_c, psf_size=args.psf_size, chip_origin=chip_origin)
-    ref_clean = psf_gen.compute_clean_beam(mid_r, mid_c, psf_size=args.psf_size, beam_type=args.beam, chip_origin=chip_origin)
-
-    # Plot comparison
-    print(f"[*] Generating comparison plot to: {out_plot}")
-    plot_clean_comparison(
-        dirty_image=dirty_img,
-        clean_image=res.clean_image,
-        residual_image=res.residual_image,
-        components_map=res.components_map,
-        output_path=out_plot,
-        title=f"Exact Spatially-Varying CLEAN ({base_name})",
-        dyn_range_db=args.dyn_range,
-        psf_dirty=ref_dirty,
-        psf_clean=ref_clean,
-        ref_val=args.ref_val,
-    )
-    print("[+] All done successfully!")
+            plot_comparison(
+                dirty_image=dirty_img,
+                clean_image=result.clean_image,
+                residual_image=result.residual_image,
+                restored_model=result.restored_model,
+                output_png=args.plot,
+                dyn_range_db=args.dyn_range,
+                title_suffix=os.path.basename(input_path),
+                ref_val=args.ref_val,
+            )
+        except ImportError:
+            print("[!] Matplotlib not available; skipping plot generation.")
 
 
 if __name__ == "__main__":

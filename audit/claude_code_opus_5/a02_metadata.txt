@@ -1,0 +1,348 @@
+========================================================================================
+2023-07-30-17-19-39_UMBRA-05_SICD.nitf
+========================================================================================
+  NumRows/NumCols   : 5580 x 12897
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [2780. 6432.]
+  Row SS / Col SS   : 0.480499 / 0.412127  m
+  Row BW / Col BW   : 1.623602 / 1.920772  cycles/m
+  Row Wid / Col Wid : 0.545541 / 0.461139  m
+  Row KCtr / Col KCtr: 64.0410781220773 / 1.742834931928172e-08
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.8118011347557044 / 0.8118011347557115
+  Col DeltaK1/2     : -0.9603858739897044 / 0.9603858739897044
+  Grid ImagePlane   : SLANT   Type: RGAZIM
+  SCPCOA SlantRange : 646692.47 m
+  SCPCOA GrazeAng   : 52.65050250416393  TwistAng: 38.94295067421776
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2818  col 1.2633
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -1335.787,   -2650.800)  sarkit=(   -1335.787,   -2650.800)  dmax=0
+     (  2790,  6448): naive=(       4.805,       6.594)  sarkit=(       4.805,       6.594)  dmax=0
+     (  5579, 12896): naive=(    1344.916,    2663.988)  sarkit=(    1344.916,    2663.988)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-4.107472e-03, +4.127907e-03] rad = [-0.23534, +0.23651] deg
+     total span                 : 8.235380e-03 rad (0.471853 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (13.19 m): 1.086087e-01 m = 2.635322e-01 pixels
+
+========================================================================================
+2023-09-11-10-37-05_UMBRA-05_SICD.nitf
+========================================================================================
+  NumRows/NumCols   : 2870 x 3903
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [1432. 1955.]
+  Row SS / Col SS   : 1.272321 / 1.416421  m
+  Row BW / Col BW   : 0.624187 / 0.551812  cycles/m
+  Row Wid / Col Wid : 1.419033 / 1.605154  m
+  Row KCtr / Col KCtr: 64.04403323649639 / -8.706695364679722e-09
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.31209357412946304 / 0.3120935741294488
+  Col DeltaK1/2     : -0.27590575365654196 / 0.27590575365654196
+  Grid ImagePlane   : SLANT   Type: RGAZIM
+  SCPCOA SlantRange : 764469.54 m
+  SCPCOA GrazeAng   : 41.47592156246484  TwistAng: -35.33630349840183
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2592  col 1.2794
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -1821.964,   -2769.102)  sarkit=(   -1821.964,   -2769.102)  dmax=0
+     (  1435,  1951): naive=(       3.817,      -5.666)  sarkit=(       3.817,      -5.666)  dmax=0
+     (  2869,  3902): naive=(    1828.326,    2757.771)  sarkit=(    1828.326,    2757.771)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-3.630891e-03, +3.616033e-03] rad = [-0.20803, +0.20718] deg
+     total span                 : 7.246924e-03 rad (0.415218 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (45.33 m): 3.284702e-01 m = 2.319016e-01 pixels
+
+========================================================================================
+2023-09-13-21-18-21_UMBRA-06_SICD.nitf
+========================================================================================
+  NumRows/NumCols   : 3060 x 4325
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [1526. 2167.]
+  Row SS / Col SS   : 1.105379 / 1.291179  m
+  Row BW / Col BW   : 0.711719 / 0.602488  cycles/m
+  Row Wid / Col Wid : 1.244511 / 1.470140  m
+  Row KCtr / Col KCtr: 64.04397410924715 / -2.8978550448144343e-08
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.3558594059331526 / 0.35585940593314547
+  Col DeltaK1/2     : -0.30124413304019604 / 0.30124413304019604
+  Grid ImagePlane   : SLANT   Type: RGAZIM
+  SCPCOA SlantRange : 713804.79 m
+  SCPCOA GrazeAng   : 45.51811418100378  TwistAng: -37.04686890160895
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2711  col 1.2855
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -1686.808,   -2797.984)  sarkit=(   -1686.808,   -2797.984)  dmax=0
+     (  1530,  2162): naive=(       4.422,      -6.456)  sarkit=(       4.422,      -6.456)  dmax=0
+     (  3059,  4324): naive=(    1694.545,    2785.072)  sarkit=(    1694.545,    2785.072)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-3.929082e-03, +3.910951e-03] rad = [-0.22512, +0.22408] deg
+     total span                 : 7.840032e-03 rad (0.449201 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (41.32 m): 3.239322e-01 m = 2.508810e-01 pixels
+
+========================================================================================
+2023-10-04-02-03-26_UMBRA-04_SICD.nitf
+========================================================================================
+  NumRows/NumCols   : 3479 x 5340
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [1732. 2675.]
+  Row SS / Col SS   : 0.743781 / 1.078226  m
+  Row BW / Col BW   : 1.072450 / 0.737065  cycles/m
+  Row Wid / Col Wid : 0.825905 / 1.201715  m
+  Row KCtr / Col KCtr: 64.04390009105823 / -6.1631253434057995e-09
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.5362250814594702 / 0.5362250814594773
+  Col DeltaK1/2     : -0.36853243258568874 / 0.36853243258568874
+  Grid ImagePlane   : SLANT   Type: RGAZIM
+  SCPCOA SlantRange : 613678.03 m
+  SCPCOA GrazeAng   : 56.71506127487979  TwistAng: -39.42781867348685
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2537  col 1.2583
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -1288.229,   -2884.254)  sarkit=(   -1288.229,   -2884.254)  dmax=0
+     (  1739,  2670): naive=(       5.206,      -5.391)  sarkit=(       5.206,      -5.391)  dmax=0
+     (  3478,  5339): naive=(    1298.642,    2872.393)  sarkit=(    1298.642,    2872.393)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-4.709798e-03, +4.690431e-03] rad = [-0.26985, +0.26874] deg
+     total span                 : 9.400229e-03 rad (0.538593 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (34.50 m): 3.243382e-01 m = 3.008073e-01 pixels
+
+========================================================================================
+2023-11-14-03-38-20_UMBRA-04_SICD.nitf
+========================================================================================
+  NumRows/NumCols   : 5086 x 8631
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [2532. 4326.]
+  Row SS / Col SS   : 0.497360 / 0.640693  m
+  Row BW / Col BW   : 1.576763 / 1.197567  cycles/m
+  Row Wid / Col Wid : 0.561747 / 0.739618  m
+  Row KCtr / Col KCtr: 64.04254037241425 / -1.0745559553271276e-08
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.7883817015854646 / 0.7883817015854646
+  Col DeltaK1/2     : -0.5987833975544617 / 0.5987833975544617
+  Grid ImagePlane   : SLANT   Type: RGAZIM
+  SCPCOA SlantRange : 606903.93 m
+  SCPCOA GrazeAng   : 55.86783064149226  TwistAng: -42.39365956506928
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2752  col 1.3033
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -1259.315,   -2771.636)  sarkit=(   -1259.315,   -2771.636)  dmax=0
+     (  2543,  4315): naive=(       5.471,      -7.048)  sarkit=(       5.471,      -7.048)  dmax=0
+     (  5085,  8630): naive=(    1269.760,    2757.541)  sarkit=(    1269.760,    2757.541)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-4.576309e-03, +4.553036e-03] rad = [-0.26220, +0.26087] deg
+     total span                 : 9.129345e-03 rad (0.523073 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (20.50 m): 1.871713e-01 m = 2.921391e-01 pixels
+
+========================================================================================
+2025-10-26-05-00-15_UMBRA-08_SICD.nitf
+========================================================================================
+  NumRows/NumCols   : 6655 x 7500
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [3327. 3750.]
+  Row SS / Col SS   : 0.638427 / 0.889475  m
+  Row BW / Col BW   : 1.253079 / 0.899407  cycles/m
+  Row Wid / Col Wid : 0.706978 / 0.984982  m
+  Row KCtr / Col KCtr: 63.919516717039315 / 0.0
+  Row WgtType       : 'UNIFORM'   Col WgtType: 'UNIFORM'
+  Row DeltaK1/2     : -0.6265395775224437 / 0.6265395775224437
+  Col DeltaK1/2     : -0.44970360469560444 / 0.44970360469560444
+  Grid ImagePlane   : SLANT   Type: RGAZIM
+  SCPCOA SlantRange : 567756.04 m
+  SCPCOA GrazeAng   : 45.010394808416144  TwistAng: -9.942309972004852
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2500  col 1.2500
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2124.048,   -3335.530)  sarkit=(   -2124.048,   -3335.530)  dmax=0
+     (  3327,  3750): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  6654,  7499): naive=(    2124.048,    3334.641)  sarkit=(    2124.048,    3334.641)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-5.896929e-03, +5.895356e-03] rad = [-0.33787, +0.33778] deg
+     total span                 : 1.179229e-02 rad (0.675648 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (28.46 m): 3.356461e-01 m = 3.773531e-01 pixels
+
+========================================================================================
+2023-07-30-17-19-39_UMBRA-05_SICDU_X_X.nitf
+========================================================================================
+  NumRows/NumCols   : 8400 x 9900
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [4200. 4950.]
+  Row SS / Col SS   : 0.476190 / 0.404040  m
+  Row BW / Col BW   : 1.674791 / 1.971357  cycles/m
+  Row Wid / Col Wid : 0.597090 / 0.507265  m
+  Row KCtr / Col KCtr: 0.0 / 0.0
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.8373953380427324 / 0.8373953380427324
+  Col DeltaK1/2     : -0.9856782629167179 / 0.9856782629167179
+  Grid ImagePlane   : SLANT   Type: PLANE
+  SCPCOA SlantRange : 646705.36 m
+  SCPCOA GrazeAng   : 52.64881  TwistAng: 38.94584
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2539  col 1.2555
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2000.000,   -2000.000)  sarkit=(   -2000.000,   -2000.000)  dmax=0
+     (  4200,  4950): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  8399,  9899): naive=(    1999.524,    1999.596)  sarkit=(    1999.524,    1999.596)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-3.102182e-03, +3.101555e-03] rad = [-0.17774, +0.17771] deg
+     total span                 : 6.203737e-03 rad (0.355448 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (12.93 m): 8.020993e-02 m = 1.985196e-01 pixels
+
+========================================================================================
+2023-09-11-10-37-05_UMBRA-05_SICDU_X_X.nitf
+========================================================================================
+  NumRows/NumCols   : 3168 x 2800
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [1584. 1400.]
+  Row SS / Col SS   : 1.262626 / 1.428571  m
+  Row BW / Col BW   : 0.632804 / 0.557966  cycles/m
+  Row Wid / Col Wid : 1.580268 / 1.792225  m
+  Row KCtr / Col KCtr: 0.0 / 0.0
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.3164020487859922 / 0.3164020487859922
+  Col DeltaK1/2     : -0.2789828522540772 / 0.2789828522540772
+  Grid ImagePlane   : SLANT   Type: PLANE
+  SCPCOA SlantRange : 764471.31 m
+  SCPCOA GrazeAng   : 41.475787  TwistAng: -35.336494
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2516  col 1.2546
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2000.000,   -2000.000)  sarkit=(   -2000.000,   -2000.000)  dmax=0
+     (  1584,  1400): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  3167,  2799): naive=(    1998.737,    1998.571)  sarkit=(    1998.737,    1998.571)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-2.623044e-03, +2.621170e-03] rad = [-0.15029, +0.15018] deg
+     total span                 : 5.244213e-03 rad (0.300471 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (45.71 m): 2.397355e-01 m = 1.678148e-01 pixels
+
+========================================================================================
+2023-09-13-21-18-21_UMBRA-06_SICDU_X_X.nitf
+========================================================================================
+  NumRows/NumCols   : 3630 x 3072
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [1815. 1536.]
+  Row SS / Col SS   : 1.101928 / 1.302083  m
+  Row BW / Col BW   : 0.720827 / 0.609966  cycles/m
+  Row Wid / Col Wid : 1.387296 / 1.639437  m
+  Row KCtr / Col KCtr: 0.0 / 0.0
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.3604133627852306 / 0.3604133627852306
+  Col DeltaK1/2     : -0.30498280187670823 / 0.30498280187670823
+  Grid ImagePlane   : SLANT   Type: PLANE
+  SCPCOA SlantRange : 713806.82 m
+  SCPCOA GrazeAng   : 45.517921  TwistAng: -37.047151
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2590  col 1.2591
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2000.000,   -2000.000)  sarkit=(   -2000.000,   -2000.000)  dmax=0
+     (  1815,  1536): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  3629,  3071): naive=(    1998.898,    1998.698)  sarkit=(    1998.898,    1998.698)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-2.809744e-03, +2.807914e-03] rad = [-0.16099, +0.16088] deg
+     total span                 : 5.617658e-03 rad (0.321868 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (41.67 m): 2.340691e-01 m = 1.797651e-01 pixels
+
+========================================================================================
+2023-10-04-02-03-26_UMBRA-04_SICDU_X_X.nitf
+========================================================================================
+  NumRows/NumCols   : 5500 x 3773
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [2750. 1886.]
+  Row SS / Col SS   : 0.727273 / 1.060164  m
+  Row BW / Col BW   : 1.098755 / 0.750437  cycles/m
+  Row Wid / Col Wid : 0.910121 / 1.332558  m
+  Row KCtr / Col KCtr: 0.0 / 0.0
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.5493776220729245 / 0.5493776220729245
+  Col DeltaK1/2     : -0.3752182549148868 / 0.3752182549148868
+  Grid ImagePlane   : SLANT   Type: PLANE
+  SCPCOA SlantRange : 613679.45 m
+  SCPCOA GrazeAng   : 56.714835  TwistAng: -39.428251
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2514  col 1.2569
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2000.000,   -1999.470)  sarkit=(   -2000.000,   -1999.470)  dmax=0
+     (  2750,  1886): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  5499,  3772): naive=(    1999.273,    1999.470)  sarkit=(    1999.273,    1999.470)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-3.268808e-03, +3.268808e-03] rad = [-0.18729, +0.18729] deg
+     total span                 : 6.537616e-03 rad (0.374578 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (33.93 m): 2.217903e-01 m = 2.092037e-01 pixels
+
+========================================================================================
+2023-11-14-03-38-20_UMBRA-04_SICDU_X_X.nitf
+========================================================================================
+  NumRows/NumCols   : 9800 x 7290
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [4900. 3645.]
+  Row SS / Col SS   : 0.408163 / 0.548697  m
+  Row BW / Col BW   : 1.948825 / 1.455398  cycles/m
+  Row Wid / Col Wid : 0.513130 / 0.687097  m
+  Row KCtr / Col KCtr: 0.0 / 0.0
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.9744124510952972 / 0.9744124510952972
+  Col DeltaK1/2     : -0.7276991738227574 / 0.7276991738227574
+  Grid ImagePlane   : SLANT   Type: PLANE
+  SCPCOA SlantRange : 606910.06 m
+  SCPCOA GrazeAng   : 55.866865  TwistAng: -42.39526
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2572  col 1.2522
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2000.000,   -2000.000)  sarkit=(   -2000.000,   -2000.000)  dmax=0
+     (  4900,  3645): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  9799,  7289): naive=(    1999.592,    1999.451)  sarkit=(    1999.592,    1999.451)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-3.306265e-03, +3.305358e-03] rad = [-0.18944, +0.18938] deg
+     total span                 : 6.611622e-03 rad (0.378818 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (17.56 m): 1.160888e-01 m = 2.115719e-01 pixels
+
+========================================================================================
+2025-10-26-05-00-15_UMBRA-08_SICDU_V_V.nitf
+========================================================================================
+  NumRows/NumCols   : 9450 x 6720
+  FirstRow/FirstCol : 0, 0
+  SCPPixel          : [4725. 3360.]
+  Row SS / Col SS   : 0.529101 / 0.744048  m
+  Row BW / Col BW   : 1.506872 / 1.067293  cycles/m
+  Row Wid / Col Wid : 0.663627 / 0.936950  m
+  Row KCtr / Col KCtr: 0.0 / 0.0
+  Row WgtType       : None   Col WgtType: None
+  Row DeltaK1/2     : -0.7534357675727072 / 0.7534357675727072
+  Col DeltaK1/2     : -0.5336464321694164 / 0.5336464321694164
+  Grid ImagePlane   : SLANT   Type: PLANE
+  SCPCOA SlantRange : 567850.04 m
+  SCPCOA GrazeAng   : 44.999523  TwistAng: -10.007272
+  ImageFormation    : PFA
+  is_pfa / is_rma   : True / False
+  Oversample (1/(SS*BW)): row 1.2543  col 1.2593
+  -- config.global_to_metric (naive) vs sarkit rowcol_to_xrowycol (rigorous) --
+     (     0,     0): naive=(   -2500.000,   -2500.000)  sarkit=(   -2500.000,   -2500.000)  dmax=0
+     (  4725,  3360): naive=(       0.000,       0.000)  sarkit=(       0.000,       0.000)  dmax=0
+     (  9449,  6719): naive=(    2499.471,    2499.256)  sarkit=(    2499.471,    2499.256)  dmax=0
+     worst disagreement: 0 m
+  -- spatially-varying shear angle theta --
+     theta range over full scene: [-4.422010e-03, +4.420694e-03] rad = [-0.25336, +0.25329] deg
+     total span                 : 8.842705e-03 rad (0.506650 deg)
+     max PSF-edge displacement from rotation, at 32 px lever arm (23.81 m): 2.105406e-01 m = 2.829665e-01 pixels
+

@@ -1,0 +1,19 @@
+showcase chip (256, 256) from demo_clean.py UMBRA_CHIP (1932, 3931, 2188, 4187)
+declared: row_wid=0.5617 m col_wid=0.7396 m  row_ss=0.4974 col_ss=0.6407
+brightest scatterer at chip (128,128), |amp|=3.2832
+mainlobe ~1.15 px; core mask r<=2 px, sidelobe annulus 2<r<=40 px (5012 pixels)
+
+DIRTY image: integrated sidelobe energy = -2.714 dB rel. mainlobe peak power; mainlobe peak |A| = 3.2832
+
+  variant                  reported   TRUE sidelobe   sidelobe   mainlobe peak
+                           suppr dB       energy dB  change dB       preserved
+  ---------------------- ---------- --------------- ---------- ---------------
+  CORRECT physics             33.98          -7.169     -4.455          0.988x
+  delta PSF (bw=1e6)          33.44          -7.778     -5.064          1.506x
+  bandwidth x2 (wrong)        31.58          -8.270     -5.556          2.703x
+  bandwidth /2 (wrong)         7.11           1.335     +4.049         15.052x
+
+Interpretation:
+  'reported suppr dB' is what the README, demo, benchmark CSVs and the
+  'parity' test all quote. 'TRUE sidelobe energy change' is what the phrase
+  'Sidelobe Suppression' actually promises. They are different quantities.

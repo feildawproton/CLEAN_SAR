@@ -2,23 +2,20 @@ import numpy as np
 import torch
 from collections import OrderedDict
 from typing import Optional, Tuple, Union, Literal, Dict
-from .sicd_handler import SICDHandler
+from .config import CleanPhysicsConfig
 
 
 class PSFGenerator:
     """
     Spatially-varying Impulse Response (IPR) / Point Spread Function (PSF) generator
-    for SAR complex images formed from SICD metadata.
+    parameterized by a pure scalar CleanPhysicsConfig.
 
-    Supports:
-    - Option A: 2D Spatial Frequency Support + IFFT (k-space domain)
-    - Option B: Analytic / Polynomial Spatial-Domain formulation with windowing and geometric shear
-    - Clean Beam generation (matched Gaussian restoring beam)
-    - LRU Cache of exact on-device PyTorch tensors for high-performance iteration
+    Computes the exact analytic spatial-domain IPR via continuous modulated sinc series,
+    polar shear angle rotation, and aperture weighting.
     """
 
-    def __init__(self, sicd: SICDHandler, max_cache_size: int = 4096):
-        self.sicd = sicd
+    def __init__(self, config: CleanPhysicsConfig, max_cache_size: int = 4096):
+        self.config = config
         self.max_cache_size = max_cache_size
         self._cache_dirty: OrderedDict[Tuple, torch.Tensor] = OrderedDict()
         self._cache_clean: OrderedDict[Tuple, torch.Tensor] = OrderedDict()
@@ -32,234 +29,104 @@ class PSFGenerator:
         self,
         row: Union[int, float],
         col: Union[int, float],
-        chip_origin: Optional[Tuple[int, int]] = None
     ) -> Tuple[float, float, float, float]:
         """
-        Resolves input row/col (global or chip) to global (row_g, col_g) and metric (xrow, ycol).
+        Resolves input row/col (chip or global) to global (row_g, col_g) and metric (xrow, ycol).
         """
-        if chip_origin is not None:
-            r_g, c_g = self.sicd.chip_to_global_rowcol(row, col, chip_origin[0], chip_origin[1])
-        else:
-            r_g, c_g = float(row), float(col)
-
-        xrow, ycol = self.sicd.global_to_metric(r_g, c_g)
+        r_g, c_g = self.config.chip_to_global(float(row), float(col))
+        xrow, ycol = self.config.global_to_metric(r_g, c_g)
         return float(r_g), float(c_g), float(xrow), float(ycol)
 
-    @staticmethod
-    def _eval_window_continuous(norm_freq: np.ndarray, name: Optional[str]) -> np.ndarray:
-        """
-        Evaluates a 1D weighting window over continuous normalized frequency [-1, 1].
-        """
-        if name is None or name.upper() in ["UNIFORM", "RECT", "RECTANGULAR", "NONE"]:
-            w = np.ones_like(norm_freq, dtype=np.float64)
-            w[np.abs(norm_freq) > 1.0] = 0.0
-            return w
-
-        name_upper = name.upper()
-        in_band = np.abs(norm_freq) <= 1.0
-        w = np.zeros_like(norm_freq, dtype=np.float64)
-
-        if name_upper == "HAMMING":
-            w[in_band] = 0.54 + 0.46 * np.cos(np.pi * norm_freq[in_band])
-        elif name_upper in ["HANN", "HANNING"]:
-            w[in_band] = 0.5 * (1.0 + np.cos(np.pi * norm_freq[in_band]))
-        elif name_upper == "TAYLOR":
-            # Standard Taylor window cosine series (nbar=4, sll=-30dB)
-            # W(u) = 1 + 2 * sum_{m=1}^{nbar-1} Fm * cos(pi * m * u) for u in [-1, 1]
-            fm = [0.29265601, -0.01578375, 0.00218104]
-            u = norm_freq[in_band]
-            w_tay = np.ones_like(u, dtype=np.float64)
-            for m_idx, coeff in enumerate(fm, start=1):
-                w_tay += 2.0 * coeff * np.cos(np.pi * m_idx * u)
-            max_val = np.max(w_tay) if len(w_tay) > 0 else 1.0
-            if max_val > 0:
-                w_tay /= max_val
-            w[in_band] = w_tay
-        else:
-            w[in_band] = 1.0
-
-        return w
-
-    def compute_psf_kspace(
+    def compute_psf(
         self,
         row: Union[int, float],
         col: Union[int, float],
         psf_size: int = 65,
         window_row: Optional[str] = None,
         window_col: Optional[str] = None,
-        chip_origin: Optional[Tuple[int, int]] = None,
     ) -> np.ndarray:
         """
-        Option A: Computes the local complex Dirty PSF via 2D spatial frequency aperture support and IFFT.
+        Computes the local complex Dirty PSF analytically using modulated sinc series
+        rotated by the exact local polar shear angle theta(x, y).
 
         Parameters
         ----------
         row, col : int or float
-            Image coordinates (global or relative to chip_origin).
+            Image pixel coordinates (chip local or global).
         psf_size : int
-            Kernel dimension (must be odd, e.g. 65 or 129).
+            Kernel dimension (must be odd, default: 65).
         window_row, window_col : str, optional
-            Aperture weighting windows. If None, uses SICD Grid.Row/Col.WgtType.
-        chip_origin : tuple of (start_row, start_col), optional
+            Aperture weighting window name ('UNIFORM', 'TAYLOR', 'HAMMING', 'HANN').
+            If None, uses metadata window from config.
 
         Returns
         -------
-        psf : np.ndarray (complex64)
-            Normalized 2D complex dirty PSF of shape (psf_size, psf_size) centered at (psf_size//2, psf_size//2).
+        np.ndarray
+            2D complex dirty PSF array of shape (psf_size, psf_size), normalized to 1.0 at center.
         """
         if psf_size % 2 == 0:
             psf_size += 1
 
-        r_g, c_g, xrow, ycol = self._get_metric_coords(row, col, chip_origin)
+        _, _, xrow, ycol = self._get_metric_coords(row, col)
 
-        ss_r = self.sicd.row_ss
-        ss_c = self.sicd.col_ss
-        bw_r = self.sicd.row_bw
-        bw_c = self.sicd.col_bw
+        # Exact local polar shear angle theta relative to SCP and slant range R0
+        theta = np.arctan2(ycol, self.config.scp_slant_range + xrow)
+        cos_t = np.cos(theta)
+        sin_t = np.sin(theta)
 
-        # Frequency sampling steps: dK = 1 / (N * SS)
-        dk_r = 1.0 / (psf_size * ss_r)
-        dk_c = 1.0 / (psf_size * ss_c)
+        dr_idx = np.arange(psf_size) - psf_size // 2
+        dc_idx = np.arange(psf_size) - psf_size // 2
+        DR, DC = np.meshgrid(dr_idx, dc_idx, indexing="ij")
 
-        # Baseband frequency grid centered at (0, 0)
-        kh = psf_size // 2
-        k_r_vec = (np.arange(psf_size) - kh) * dk_r
-        k_c_vec = (np.arange(psf_size) - kh) * dk_c
-        K_R, K_C = np.meshgrid(k_r_vec, k_c_vec, indexing="ij")
+        U = DR * self.config.row_ss
+        V = DC * self.config.col_ss
 
-        # Nominal bandwidth limits in baseband
-        half_bw_r = bw_r / 2.0
-        half_bw_c = bw_c / 2.0
-
-        # Local geometry and PFA spatial frequency distortion
-        if self.sicd.is_pfa:
-            # Dynamic slant range from SCPCOA (meters)
-            r0 = self.sicd.scp_slant_range
-            theta_local = np.arctan2(ycol, r0 + xrow)
-
-            # Rotated / sheared frequency coordinates
-            cos_t = np.cos(theta_local)
-            sin_t = np.sin(theta_local)
-            K_R_prime = K_R * cos_t + K_C * sin_t
-            K_C_prime = -K_R * sin_t + K_C * cos_t
-        else:
-            K_R_prime = K_R
-            K_C_prime = K_C
-
-        # Active aperture mask
-        mask_r = np.abs(K_R_prime) <= half_bw_r
-        mask_c = np.abs(K_C_prime) <= half_bw_c
-        aperture_mask = mask_r & mask_c
-
-        # Window weighting
-        w_r_name = window_row if window_row is not None else self.sicd.row_wgt_name
-        w_c_name = window_col if window_col is not None else self.sicd.col_wgt_name
-
-        norm_kr = np.clip(K_R_prime / half_bw_r, -1.0, 1.0)
-        norm_kc = np.clip(K_C_prime / half_bw_c, -1.0, 1.0)
-
-        w_2d_r = self._eval_window_continuous(norm_kr, w_r_name)
-        w_2d_c = self._eval_window_continuous(norm_kc, w_c_name)
-        window_2d = w_2d_r * w_2d_c
-
-        spectrum = np.zeros((psf_size, psf_size), dtype=np.complex128)
-        spectrum[aperture_mask] = window_2d[aperture_mask]
-
-        # 2D Inverse FFT with exact DC centering
-        psf = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(spectrum)))
-
-        # Normalize peak to 1.0 and zero phase at center
-        center_val = psf[kh, kh]
-        if np.abs(center_val) > 0:
-            psf = psf / center_val
-
-        return psf.astype(np.complex64)
-
-    def compute_psf_analytic(
-        self,
-        row: Union[int, float],
-        col: Union[int, float],
-        psf_size: int = 65,
-        window_row: Optional[str] = None,
-        window_col: Optional[str] = None,
-        chip_origin: Optional[Tuple[int, int]] = None,
-    ) -> np.ndarray:
-        """
-        Option B: Computes the local complex Dirty PSF analytically in the spatial domain
-        with local resolution bandwidths, aperture windowing, and geometric shear.
-
-        Parameters
-        ----------
-        row, col : int or float
-            Image coordinates (global or relative to chip_origin).
-        psf_size : int
-            Kernel dimension (must be odd).
-        window_row, window_col : str, optional
-            Aperture weighting windows.
-        chip_origin : tuple of (start_row, start_col), optional
-
-        Returns
-        -------
-        psf : np.ndarray (complex64)
-            Normalized 2D complex dirty PSF of shape (psf_size, psf_size).
-        """
-        if psf_size % 2 == 0:
-            psf_size += 1
-
-        r_g, c_g, xrow, ycol = self._get_metric_coords(row, col, chip_origin)
-
-        ss_r = self.sicd.row_ss
-        ss_c = self.sicd.col_ss
-        bw_r = self.sicd.row_bw
-        bw_c = self.sicd.col_bw
-
-        kh = psf_size // 2
-        u_vec = (np.arange(psf_size) - kh) * ss_r
-        v_vec = (np.arange(psf_size) - kh) * ss_c
-        U, V = np.meshgrid(u_vec, v_vec, indexing="ij")
-
-        # Local shear angle from position
-        r0 = self.sicd.scp_slant_range
-        theta_local = np.arctan2(ycol, r0 + xrow)
-        cos_t = np.cos(theta_local)
-        sin_t = np.sin(theta_local)
-
-        U_prime = U * cos_t + V * sin_t
+        # Rotate spatial metric coordinates by local polar angle
+        U_prime =  U * cos_t + V * sin_t
         V_prime = -U * sin_t + V * cos_t
 
-        w_r_name = window_row if window_row is not None else self.sicd.row_wgt_name
-        w_c_name = window_col if window_col is not None else self.sicd.col_wgt_name
+        w_row_type = (window_row or self.config.row_wgt or "UNIFORM").upper()
+        w_col_type = (window_col or self.config.col_wgt or "UNIFORM").upper()
 
-        def _analytic_1d(coord_meters: np.ndarray, bw: float, win_name: Optional[str]) -> np.ndarray:
-            if win_name is None or win_name.upper() in ["UNIFORM", "RECT", "RECTANGULAR", "NONE"]:
-                return np.sinc(bw * coord_meters)
-            name_u = win_name.upper()
-            if name_u == "HAMMING":
-                return 0.54 * np.sinc(bw * coord_meters) + 0.23 * (
-                    np.sinc(bw * coord_meters - 1.0) + np.sinc(bw * coord_meters + 1.0)
+        def _eval_1d_pattern(pos, bw, wgt):
+            if wgt in ["UNIFORM", "RECT", "RECTANGULAR", "NONE"]:
+                return np.sinc(bw * pos)
+            elif wgt == "HAMMING":
+                return (
+                    0.54 * np.sinc(bw * pos)
+                    + 0.23 * np.sinc(bw * pos - 1.0)
+                    + 0.23 * np.sinc(bw * pos + 1.0)
                 )
-            elif name_u in ["HANN", "HANNING"]:
-                return 0.50 * np.sinc(bw * coord_meters) + 0.25 * (
-                    np.sinc(bw * coord_meters - 1.0) + np.sinc(bw * coord_meters + 1.0)
+            elif wgt in ["HANN", "HANNING"]:
+                return (
+                    0.5 * np.sinc(bw * pos)
+                    + 0.25 * np.sinc(bw * pos - 1.0)
+                    + 0.25 * np.sinc(bw * pos + 1.0)
                 )
-            elif name_u == "TAYLOR":
+            elif wgt == "TAYLOR":
+                # Standard Taylor window (nbar=4, SLL=-30dB)
                 fm = [0.29265601, -0.01578375, 0.00218104]
-                resp = np.sinc(bw * coord_meters).astype(np.float64)
-                for m_idx, f_val in enumerate(fm, start=1):
-                    resp += f_val * (np.sinc(bw * coord_meters - m_idx) + np.sinc(bw * coord_meters + m_idx))
-                return resp
-            else:
-                return np.sinc(bw * coord_meters)
+                pat = np.sinc(bw * pos)
+                for m_idx, coeff in enumerate(fm, start=1):
+                    pat += coeff * (
+                        np.sinc(bw * pos - m_idx) + np.sinc(bw * pos + m_idx)
+                    )
+                return pat
+            return np.sinc(bw * pos)
 
-        resp_u = _analytic_1d(U_prime, bw_r, w_r_name)
-        resp_v = _analytic_1d(V_prime, bw_c, w_c_name)
-        psf = (resp_u * resp_v).astype(np.complex128)
+        psf_r = _eval_1d_pattern(U_prime, self.config.row_bw, w_row_type)
+        psf_a = _eval_1d_pattern(V_prime, self.config.col_bw, w_col_type)
 
-        center_val = psf[kh, kh]
-        if np.abs(center_val) > 0:
-            psf = psf / center_val
+        psf = psf_r * psf_a
+        max_idx = (psf_size // 2, psf_size // 2)
+        peak_val = psf[max_idx]
+        if np.abs(peak_val) > 0:
+            psf = psf / peak_val
 
         return psf.astype(np.complex64)
+
+    # Alias for backward compatibility
+    compute_psf_analytic = compute_psf
 
     def compute_clean_beam(
         self,
@@ -267,128 +134,87 @@ class PSFGenerator:
         col: Union[int, float],
         psf_size: int = 65,
         beam_type: Literal["gaussian", "mainlobe"] = "gaussian",
-        chip_origin: Optional[Tuple[int, int]] = None,
     ) -> np.ndarray:
         """
-        Generates the Clean (restoring) beam.
-
-        - 'gaussian': 2D elliptical Gaussian matched to local 3dB impulse response widths.
-        - 'mainlobe': Truncated mainlobe of the dirty PSF without sidelobes.
-
-        Parameters
-        ----------
-        row, col : int or float
-            Image coordinates.
-        psf_size : int
-            Kernel dimension (must be odd).
-        beam_type : str
-            'gaussian' or 'mainlobe'.
-
-        Returns
-        -------
-        clean_beam : np.ndarray (complex64)
-            Sidelobe-free restoring beam normalized to peak 1.0.
+        Computes the local clean restoring beam (matched 3dB Gaussian or dirty mainlobe).
         """
         if psf_size % 2 == 0:
             psf_size += 1
 
-        r_g, c_g, xrow, ycol = self._get_metric_coords(row, col, chip_origin)
-        kh = psf_size // 2
+        if beam_type == "mainlobe":
+            dirty = self.compute_psf(row, col, psf_size=psf_size)
+            center = psf_size // 2
+            beam = np.zeros_like(dirty, dtype=np.complex64)
+            beam[center, center] = 1.0 + 0j
+            visited = np.zeros((psf_size, psf_size), dtype=bool)
+            visited[center, center] = True
+            queue = [(center, center)]
+            while queue:
+                r, c = queue.pop(0)
+                beam[r, c] = dirty[r, c]
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < psf_size and 0 <= nc < psf_size and not visited[nr, nc]:
+                        visited[nr, nc] = True
+                        if np.abs(dirty[nr, nc]) < np.abs(dirty[r, c]) and np.abs(dirty[nr, nc]) > 0.1:
+                            queue.append((nr, nc))
+            return beam
 
-        if beam_type == "gaussian":
-            wid_r = self.sicd.row_wid
-            wid_c = self.sicd.col_wid
-            ss_r = self.sicd.row_ss
-            ss_c = self.sicd.col_ss
+        # Gaussian beam matched to -3dB resolution width
+        dr_idx = np.arange(psf_size) - psf_size // 2
+        dc_idx = np.arange(psf_size) - psf_size // 2
+        DR, DC = np.meshgrid(dr_idx, dc_idx, indexing="ij")
 
-            # 3dB (half-power) resolution width to Gaussian sigma:
-            # Power P(x) = |E(x)|^2 = exp(-x^2 / sigma^2). At x = W/2, P(W/2) = 0.5 (-3.01 dB)
-            # exp(-(W/2)^2 / sigma^2) = 0.5 ==> sigma = W / (2 * sqrt(ln(2))) ≈ W / 1.665109
-            factor_3db = 2.0 * np.sqrt(np.log(2.0))
-            sigma_r = wid_r / factor_3db
-            sigma_c = wid_c / factor_3db
+        U = DR * self.config.row_ss
+        V = DC * self.config.col_ss
 
-            u_vec = (np.arange(psf_size) - kh) * ss_r
-            v_vec = (np.arange(psf_size) - kh) * ss_c
-            U, V = np.meshgrid(u_vec, v_vec, indexing="ij")
+        _, _, xrow, ycol = self._get_metric_coords(row, col)
+        theta = np.arctan2(ycol, self.config.scp_slant_range + xrow)
+        cos_t = np.cos(theta)
+        sin_t = np.sin(theta)
 
-            # Local shear rotation
-            r0 = self.sicd.scp_slant_range
-            theta_local = np.arctan2(ycol, r0 + xrow)
-            cos_t = np.cos(theta_local)
-            sin_t = np.sin(theta_local)
-            U_p = U * cos_t + V * sin_t
-            V_p = -U * sin_t + V * cos_t
+        U_prime =  U * cos_t + V * sin_t
+        V_prime = -U * sin_t + V * cos_t
 
-            exponent = -0.5 * ((U_p / sigma_r) ** 2 + (V_p / sigma_c) ** 2)
-            clean_beam = np.exp(exponent).astype(np.complex64)
-            clean_beam /= np.abs(clean_beam[kh, kh])
-            return clean_beam
+        fwhm_const = 2.0 * np.sqrt(np.log(2.0))
+        sigma_r = self.config.row_wid / fwhm_const
+        sigma_a = self.config.col_wid / fwhm_const
 
-        elif beam_type == "mainlobe":
-            dirty_psf = self.compute_psf_kspace(row, col, psf_size=psf_size, chip_origin=chip_origin)
-            mag = np.abs(dirty_psf)
-            clean_beam = np.zeros_like(dirty_psf)
-            window_len = int(max(self.sicd.row_wid / self.sicd.row_ss, self.sicd.col_wid / self.sicd.col_ss) * 1.5)
-            r_s = max(0, kh - window_len)
-            r_e = min(psf_size, kh + window_len + 1)
-            c_s = max(0, kh - window_len)
-            c_e = min(psf_size, kh + window_len + 1)
-
-            sub_mag = mag[r_s:r_e, c_s:c_e]
-            taper_r = np.hanning(r_e - r_s)
-            taper_c = np.hanning(c_e - c_s)
-            taper_2d = np.outer(taper_r, taper_c)
-
-            clean_beam[r_s:r_e, c_s:c_e] = sub_mag * taper_2d
-            clean_beam /= np.max(np.abs(clean_beam))
-            return clean_beam.astype(np.complex64)
-        else:
-            raise ValueError(f"Unknown beam_type: {beam_type}")
+        beam = np.exp(-0.5 * ((U_prime / max(sigma_r, 1e-6))**2 + (V_prime / max(sigma_a, 1e-6))**2))
+        return beam.astype(np.complex64)
 
     def get_psfs_torch(
         self,
         row: int,
         col: int,
         psf_size: int = 65,
-        method: Literal["kspace", "analytic"] = "kspace",
-        beam_type: Literal["gaussian", "mainlobe"] = "gaussian",
-        chip_origin: Optional[Tuple[int, int]] = None,
+        beam_type: str = "gaussian",
         device: Optional[torch.device] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Retrieves LRU-cached or computes exact (dirty_psf, clean_beam) PyTorch tensors on device
-        for global coordinate (row_g, col_g).
+        Retrieves exact local dirty PSF and clean beam as PyTorch tensors on target device,
+        utilizing a bounded LRU cache.
         """
-        r_g = int(row + chip_origin[0]) if chip_origin is not None else int(row)
-        c_g = int(col + chip_origin[1]) if chip_origin is not None else int(col)
+        r_g, c_g = self.config.chip_to_global(float(row), float(col))
+        key = (int(r_g), int(c_g), psf_size, beam_type)
 
-        key_dirty = (r_g, c_g, psf_size, method)
-        key_clean = (r_g, c_g, psf_size, beam_type)
+        if key in self._cache_dirty and key in self._cache_clean:
+            self._cache_dirty.move_to_end(key)
+            self._cache_clean.move_to_end(key)
+            return self._cache_dirty[key], self._cache_clean[key]
 
-        if key_dirty in self._cache_dirty:
-            dirty_t = self._cache_dirty[key_dirty]
-            self._cache_dirty.move_to_end(key_dirty)
-        else:
-            if method == "kspace":
-                dirty_np = self.compute_psf_kspace(r_g, c_g, psf_size=psf_size)
-            else:
-                dirty_np = self.compute_psf_analytic(r_g, c_g, psf_size=psf_size)
-            dirty_t = torch.as_tensor(dirty_np, dtype=torch.complex64, device=device)
+        # Compute exact dirty PSF & clean beam
+        dirty_np = self.compute_psf(row, col, psf_size=psf_size)
+        clean_np = self.compute_clean_beam(row, col, psf_size=psf_size, beam_type=beam_type)
 
-            if len(self._cache_dirty) >= self.max_cache_size:
-                self._cache_dirty.popitem(last=False)
-            self._cache_dirty[key_dirty] = dirty_t
+        dirty_t = torch.as_tensor(dirty_np, dtype=torch.complex64, device=device)
+        clean_t = torch.as_tensor(clean_np, dtype=torch.complex64, device=device)
 
-        if key_clean in self._cache_clean:
-            clean_t = self._cache_clean[key_clean]
-            self._cache_clean.move_to_end(key_clean)
-        else:
-            clean_np = self.compute_clean_beam(r_g, c_g, psf_size=psf_size, beam_type=beam_type)
-            clean_t = torch.as_tensor(clean_np, dtype=torch.complex64, device=device)
+        if len(self._cache_dirty) >= self.max_cache_size:
+            self._cache_dirty.popitem(last=False)
+            self._cache_clean.popitem(last=False)
 
-            if len(self._cache_clean) >= self.max_cache_size:
-                self._cache_clean.popitem(last=False)
-            self._cache_clean[key_clean] = clean_t
+        self._cache_dirty[key] = dirty_t
+        self._cache_clean[key] = clean_t
 
         return dirty_t, clean_t

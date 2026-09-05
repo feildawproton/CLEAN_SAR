@@ -1,0 +1,23 @@
+================================================================================================
+WARM-UP EFFECT ON THE REPORTED SPEEDUP
+scene: 2023-09-11-10-37-05_UMBRA-05_SICD.nitf, 300 iterations
+================================================================================================
+  condition                                              torch ms    cuda ms   speedup
+  ---------------------------------------------------- ---------- ---------- ---------
+  A  current methodology (cold, one sample each, pytorch first)      664.7      167.7     3.96x
+  B  warm-up discarded, then 5 interleaved pairs            557.5      153.8     3.63x
+
+  cold-vs-warm change in reported speedup: 3.96x -> 3.63x (-8.5%)
+    pytorch compute 664.7 -> 557.5 ms (-16.1%)
+    cuda    compute 167.7 -> 153.8 ms (-8.3%)
+
+================================================================================================
+PER-SAMPLE SPREAD IN CONDITION B (is one sample enough?)
+================================================================================================
+  torch  compute ms: [533.8, 546.8, 557.5, 583.1, 557.5]
+         min=533.8 median=557.5 max=583.1 spread=8.8% of median
+  cuda   compute ms: [150.2, 153.8, 146.3, 157.2, 156.2]
+         min=146.3 median=153.8 max=157.2 spread=7.1% of median
+
+  first-sample h2d vs later (torch CUDA init lands in the first):
+    torch h2d ms: [15.3, 15.1, 15.3, 15.7, 16.4]

@@ -1,0 +1,18 @@
+==================================================================================================
+BASELINE: unmodified library
+==================================================================================================
+  recovery reference suite : 4 passed, 5 deselected in 6.07s   [PASS]
+  original test            : 1 passed, 4 warnings in 3.16s   [PASS]
+
+==================================================================================================
+ALGORITHM'S PSF MADE TO DISAGREE WITH THE TRUE IPR (runtime patch)
+==================================================================================================
+  scenario                 recovery reference               original test               
+  ------------------------ -------------------------------- ----------------------------
+  S1_delta_psf             4 failed, 5 deselected in 40.30s CAUGHT  1 passed, 4 warnings in 1.65s MISSED
+  S2_unnormalised_scale    1 failed, 3 passed, 5 deselected in 4.93s CAUGHT  1 passed, 4 warnings in 0.93s MISSED
+  S3_double_bandwidth      4 failed, 5 deselected in 48.30s CAUGHT  1 passed, 4 warnings in 1.69s MISSED
+
+  'CAUGHT' = suite failed, i.e. the broken deconvolution kernel was detected.
+  The original test asserts only max|residual| < max|dirty|, which every
+  subtractive procedure satisfies -- so it is expected to MISS all three.

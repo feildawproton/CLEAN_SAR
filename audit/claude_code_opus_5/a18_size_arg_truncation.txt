@@ -1,0 +1,19 @@
+device free = 6.95 GiB of 8.00 GiB
+
+     request         as bare Python int         as ctypes.c_size_t
+  ---------- -------------------------- --------------------------
+      0.5 GiB                    SUCCESS                    SUCCESS   (fits in free memory)
+      1.0 GiB                    SUCCESS                    SUCCESS   (fits in free memory)
+      1.5 GiB                    SUCCESS                    SUCCESS   (fits in free memory)
+      2.0 GiB              OUT_OF_MEMORY                    SUCCESS   (fits in free memory)
+      2.5 GiB              OUT_OF_MEMORY                    SUCCESS   (fits in free memory)
+      3.0 GiB              OUT_OF_MEMORY                    SUCCESS   (fits in free memory)
+      4.0 GiB              INVALID_VALUE                    SUCCESS   (fits in free memory)
+
+  A row where the bare int FAILS but c_size_t SUCCEEDS is direct evidence
+  that the unprototyped size argument is being truncated at 32 bits.
+
+  2**31 boundary = 2.0 GiB. Buffers in this codebase are
+  H*W*8 bytes, so a scene larger than 268 Mpixels crosses it.
+  Largest scene benchmarked here is 83.16 Mpixels (0.62 GiB) -- under the
+  limit, which is why this has not yet been hit.

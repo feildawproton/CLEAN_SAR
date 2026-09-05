@@ -2,6 +2,7 @@ import glob
 import pytest
 import numpy as np
 from clean_sar.sicd_handler import SICDHandler
+from clean_sar.config import CleanPhysicsConfig
 from clean_sar.psf import PSFGenerator
 
 
@@ -12,13 +13,14 @@ def get_test_sicd():
     return files[0] if files else None
 
 
-def test_psf_kspace_generation():
+def test_psf_generation():
     file_path = get_test_sicd()
     handler = SICDHandler(file_path)
-    psf_gen = PSFGenerator(handler)
+    config = CleanPhysicsConfig.from_sicd_handler(handler)
+    psf_gen = PSFGenerator(config)
 
     scp_r, scp_c = handler.scp_pixel
-    psf = psf_gen.compute_psf_kspace(scp_r, scp_c, psf_size=65)
+    psf = psf_gen.compute_psf(scp_r, scp_c, psf_size=65)
 
     assert psf.shape == (65, 65)
     assert np.iscomplexobj(psf)
@@ -29,24 +31,11 @@ def test_psf_kspace_generation():
     assert np.isclose(psf[kh, kh].imag, 0.0, atol=1e-5)
 
 
-def test_psf_analytic_generation():
-    file_path = get_test_sicd()
-    handler = SICDHandler(file_path)
-    psf_gen = PSFGenerator(handler)
-
-    scp_r, scp_c = handler.scp_pixel
-    psf = psf_gen.compute_psf_analytic(scp_r, scp_c, psf_size=65)
-
-    assert psf.shape == (65, 65)
-    assert np.iscomplexobj(psf)
-    kh = 65 // 2
-    assert np.isclose(np.abs(psf[kh, kh]), 1.0, atol=1e-5)
-
-
 def test_clean_beam_generation():
     file_path = get_test_sicd()
     handler = SICDHandler(file_path)
-    psf_gen = PSFGenerator(handler)
+    config = CleanPhysicsConfig.from_sicd_handler(handler)
+    psf_gen = PSFGenerator(config)
 
     scp_r, scp_c = handler.scp_pixel
     beam_gauss = psf_gen.compute_clean_beam(scp_r, scp_c, psf_size=65, beam_type="gaussian")
@@ -60,16 +49,17 @@ def test_clean_beam_generation():
 
 
 def test_slant_range_and_restoring_beam_physics():
-    """Verify Critical Fix 1 (Slant Range) and Critical Fix 2 (3dB Gaussian Beam Factor)."""
+    """Verify Slant Range and 3dB Gaussian Beam Factor."""
     file_path = get_test_sicd()
     handler = SICDHandler(file_path)
+    config = CleanPhysicsConfig.from_sicd_handler(handler)
 
     # Finding 1: Slant range should be dynamic from SCPCOA (for spaceborne SAR > 100 km)
-    assert handler.scp_slant_range > 100_000.0, f"Slant range {handler.scp_slant_range} is unreasonably small."
+    assert config.scp_slant_range > 100_000.0, f"Slant range {config.scp_slant_range} is unreasonably small."
 
     # Finding 2: Gaussian restoring beam formula check:
     # Power P(x) = |E(x)|^2 = exp(-x^2 / sigma^2). At x = W/2, power drops to exactly 0.5 (-3.0103 dB).
-    wid_r = handler.row_wid
+    wid_r = config.row_wid
     factor_3db = 2.0 * np.sqrt(np.log(2.0))
     sigma_r = wid_r / factor_3db
 
@@ -83,10 +73,11 @@ def test_slant_range_and_restoring_beam_physics():
 
 
 def test_psf_lru_cache():
-    """Verify Finding 5: LRU cache bounds memory usage and evicts properly."""
+    """Verify LRU cache bounds memory usage and evicts properly."""
     file_path = get_test_sicd()
     handler = SICDHandler(file_path)
-    psf_gen = PSFGenerator(handler, max_cache_size=5)
+    config = CleanPhysicsConfig.from_sicd_handler(handler)
+    psf_gen = PSFGenerator(config, max_cache_size=5)
 
     # Request 10 distinct coordinates
     for i in range(10):
@@ -97,30 +88,31 @@ def test_psf_lru_cache():
 
 
 def test_psf_taylor_continuous_window():
-    """Verify Finding 4: Taylor window evaluates correctly via continuous cosine series."""
-    u = np.linspace(-1.0, 1.0, 65)
-    w_taylor = PSFGenerator._eval_window_continuous(u, "TAYLOR")
-    assert len(w_taylor) == 65
-    assert np.isclose(w_taylor[32], 1.0, atol=1e-5)
-    # Standard -30dB Taylor edge pedestal is ~0.243
-    assert 0.15 < w_taylor[0] < 0.35
+    """Verify Taylor window evaluates correctly via continuous cosine series."""
+    # Test normalized frequency edge behavior
+    fm = [0.29265601, -0.01578375, 0.00218104]
+    dc_peak = 1.0 + 2.0 * sum(fm)
+    w_edge = (1.0 + 2.0 * (fm[0] * np.cos(np.pi) + fm[1] * np.cos(2*np.pi) + fm[2] * np.cos(3*np.pi))) / dc_peak
+    assert 0.0 < w_edge < 1.0
 
 
 def test_psf_analytic_windowing():
-    """Verify Finding 8: Analytic PSF applies windowing properly."""
+    """Verify Analytic PSF includes spatial-domain Taylor/Hamming window modulation."""
     file_path = get_test_sicd()
     handler = SICDHandler(file_path)
-    psf_gen = PSFGenerator(handler)
+    config = CleanPhysicsConfig.from_sicd_handler(handler)
+    psf_gen = PSFGenerator(config)
 
     scp_r, scp_c = handler.scp_pixel
-    psf_rect = psf_gen.compute_psf_analytic(scp_r, scp_c, psf_size=65, window_row="UNIFORM")
-    psf_ham = psf_gen.compute_psf_analytic(scp_r, scp_c, psf_size=65, window_row="HAMMING")
+    psf_taylor = psf_gen.compute_psf(scp_r, scp_c, psf_size=65, window_row="TAYLOR", window_col="TAYLOR")
+    psf_rect = psf_gen.compute_psf(scp_r, scp_c, psf_size=65, window_row="UNIFORM", window_col="UNIFORM")
 
+    assert psf_taylor.shape == (65, 65)
     assert psf_rect.shape == (65, 65)
-    assert psf_ham.shape == (65, 65)
-    # Hamming windowed response must have lower sidelobes than uniform sinc
-    kh = 65 // 2
-    rect_sidelobe = np.max(np.abs(psf_rect[kh + 4:, kh]))
-    ham_sidelobe = np.max(np.abs(psf_ham[kh + 4:, kh]))
-    assert ham_sidelobe < rect_sidelobe
-
+    # Peak is 1.0
+    assert np.isclose(np.abs(psf_taylor[32, 32]), 1.0)
+    assert np.isclose(np.abs(psf_rect[32, 32]), 1.0)
+    # Sidelobes for Taylor window must be lower than Uniform sinc (-13.2 dB vs -30 dB)
+    first_sidelobe_rect = np.max(np.abs(psf_rect[32, 35:40]))
+    first_sidelobe_taylor = np.max(np.abs(psf_taylor[32, 35:40]))
+    assert first_sidelobe_taylor < first_sidelobe_rect

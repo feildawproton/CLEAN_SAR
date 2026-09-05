@@ -1,0 +1,34 @@
+============================================================================================
+PSF VARIATION ACROSS A SCENE, vs. SLANT RANGE AND SCENE SIZE
+============================================================================================
+  max |PSF(scene corner) - PSF(SCP)|, as % of PSF peak
+
+  slant range                       0.5km    1.0km    2.5km    5.0km   10.0km
+  ------------------------------ -------- -------- -------- -------- --------
+  5 km   airborne, low              5.68%   10.49%   25.36%   28.71%   24.18%
+  20 km  airborne                   1.43%    2.77%    7.09%   11.84%   25.36%
+  50 km  airborne, standoff         0.57%    1.15%    2.77%    5.68%   10.49%
+  100 km                            0.29%    0.57%    1.43%    2.77%    5.68%
+  300 km                            0.09%    0.19%    0.48%    0.96%    1.88%
+  650 km spaceborne (this data)     0.04%    0.09%    0.22%    0.44%    0.88%
+
+  (scene half-width = distance from SCP to the furthest pixel in each axis;
+   2.5 km half-width is roughly the largest scene in this dataset)
+
+============================================================================================
+WHERE THE FEATURE STARTS TO EARN ITS COST
+============================================================================================
+  scene half-width           R0 for >1% variation      R0 for >10% variation
+  -------------------- -------------------------- --------------------------
+     1.0 km                             R0 < 57 km                  R0 < 5 km
+     2.5 km                            R0 < 143 km                 R0 < 13 km
+     5.0 km                            R0 < 287 km                 R0 < 27 km
+    10.0 km                            R0 < 573 km                 R0 < 53 km
+
+  The 12 datasets audited sit at R0 = 647-764 km with half-widths of
+  1.4-2.8 km, i.e. far outside every regime above -- hence 0.26 % of peak.
+
+  The feature is real physics and correctly implemented. It becomes
+  material for airborne collects (R0 of tens of km) and for very large
+  scenes; at spaceborne ranges it is a sub-pixel, quarter-percent
+  correction that costs a PSF recomputation on every CLEAN iteration.
