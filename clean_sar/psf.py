@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from collections import OrderedDict
-from typing import Optional, Tuple, Union, Literal, Dict
+from typing import Optional, Tuple, Union, Literal
 from .config import CleanPhysicsConfig
 
 

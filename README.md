@@ -75,12 +75,25 @@ result = processor.run(
     gain=0.1,
     threshold=0.02,
     max_iters=2500,
-    beam_type="gaussian",# 'gaussian' (matched 3dB width) or 'mainlobe'
+    beam_type="gaussian",  # 'gaussian' (matched 3dB width) or 'mainlobe'
     psf_size=65,
     verbose=True,
 )
 
-print(f"Iterations: {result.iterations}, Suppression: {result.suppression_db:.1f} dB")
+print(f"Iterations: {result.iterations}, Peak reduction: {result.peak_reduction_db:.1f} dB")
+
+# 3. Assess point-target quality (mainlobe preservation and ISLR reduction)
+from clean_sar import ipr_quality_multi, verdict
+
+quality = ipr_quality_multi(
+    dirty=processor.handler.read_full_image(),
+    clean=result.clean_image,
+    row_wid=processor.handler.row_wid,
+    col_wid=processor.handler.col_wid,
+    row_ss=processor.handler.row_ss,
+    col_ss=processor.handler.col_ss,
+)
+print(f"Quality Assessment: {verdict(quality)} (ISLR change: {quality['islr_change_db']:.2f} dB)")
 ```
 
 ---

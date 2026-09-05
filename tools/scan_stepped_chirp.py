@@ -8,7 +8,6 @@ Uses S3 HTTP Range requests (fetching only the first ~32KB XML header per CPHD).
 
 import os
 import re
-import sys
 import json
 import argparse
 import subprocess

@@ -48,7 +48,7 @@ not the 1-D cut ISLR of the SICD IPDD. It is used for the CHANGE between two
 images of the same scene, where the common normalisation cancels.
 """
 
-from typing import Optional, Sequence, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List
 import numpy as np
 
 

@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Optional, Union
+from typing import Optional
 
 
 def taylor_window_1d(length: int, nbar: int = 4, sll: float = -30.0) -> np.ndarray:

@@ -1,7 +1,4 @@
-import pytest
 import os
-import glob
-import numpy as np
 from clean_sar import CLEANProcessor, SICDHandler
 
 

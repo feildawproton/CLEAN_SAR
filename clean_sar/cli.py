@@ -1,6 +1,5 @@
 import os
 import argparse
-from typing import Optional, Tuple
 from .processor import CLEANProcessor
 
 

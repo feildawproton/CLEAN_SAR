@@ -8,11 +8,11 @@ import sys
 import math
 import time
 import ctypes
-from typing import Optional, Union, Tuple, List, Literal
+from typing import Optional, Tuple, List, Literal
 import numpy as np
 
 from ..config import CleanPhysicsConfig
-from .cuda_check import CudaDriver, Nvrtc, CudaError, NvrtcError
+from .cuda_check import CudaDriver, Nvrtc, NvrtcError
 
 
 # ---------------------------------------------------------------------------

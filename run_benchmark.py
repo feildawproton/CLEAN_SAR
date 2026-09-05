@@ -7,11 +7,10 @@ import csv
 from glob import glob
 from typing import Dict, Any, List
 import numpy as np
-import torch
 
 from clean_sar.processor import CLEANProcessor
 from clean_sar.config import CleanPhysicsConfig
-from clean_sar.algorithm import run_hogbom_clean, CleanResult
+from clean_sar.algorithm import run_hogbom_clean
 
 
 def benchmark_single_sicd(
@@ -125,7 +124,7 @@ def print_statistics_table(all_results: List[Dict[str, Any]]):
         ("write_time",          "NITF Write Time (s)"),
         ("total_time",          "Total Pipeline Time (s)"),
         ("ms_per_iter",         "Latency per Iteration (ms/iter)"),
-        ("suppression_db",      "Sidelobe Suppression (dB)"),
+        ("suppression_db",      "Peak Reduction (dB)"),
     ]
 
     for key, label in metrics_keys:

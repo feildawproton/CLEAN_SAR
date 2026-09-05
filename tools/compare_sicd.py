@@ -9,7 +9,7 @@ import os
 import sys
 import argparse
 import numpy as np
-from typing import Optional, Tuple, Union
+from typing import Optional
 
 # Add parent directory to path if run as standalone script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

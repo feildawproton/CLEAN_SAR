@@ -1,5 +1,4 @@
 import os
-import glob
 import tempfile
 import pytest
 import numpy as np
