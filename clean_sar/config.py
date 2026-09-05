@@ -25,8 +25,15 @@ class CleanPhysicsConfig:
     col_wgt: str = "UNIFORM"
 
     @classmethod
-    def from_sicd_handler(cls, handler, chip_start: Tuple[int, int] = (0, 0)):
-        """Builds configuration from a SICDHandler instance."""
+    def from_sicd_handler(cls, handler, chip_start: Optional[Tuple[int, int]] = None):
+        """Builds configuration from a SICDHandler instance, accounting for FirstRow/FirstCol."""
+        base_row = int(getattr(handler, "first_row", 0))
+        base_col = int(getattr(handler, "first_col", 0))
+        if chip_start is None:
+            r_start, c_start = base_row, base_col
+        else:
+            r_start, c_start = base_row + int(chip_start[0]), base_col + int(chip_start[1])
+
         return cls(
             row_ss=float(handler.row_ss),
             col_ss=float(handler.col_ss),
@@ -37,8 +44,8 @@ class CleanPhysicsConfig:
             scp_slant_range=float(handler.scp_slant_range),
             scp_row=float(handler.scp_pixel[0]),
             scp_col=float(handler.scp_pixel[1]),
-            chip_start_row=int(chip_start[0]),
-            chip_start_col=int(chip_start[1]),
+            chip_start_row=r_start,
+            chip_start_col=c_start,
             row_wgt=str(handler.row_wgt_name or "UNIFORM"),
             col_wgt=str(handler.col_wgt_name or "UNIFORM"),
         )

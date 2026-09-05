@@ -6,7 +6,7 @@ AvailableBackend = Literal["auto", "pytorch", "cuda"]
 
 def is_cuda_native_available() -> bool:
     """
-    Checks if the compiled native C++/CUDA shared library (libcleansar.so) is available.
+    Checks if the native C++/CUDA backend (NVRTC + CUDA Driver API) is available.
     """
     return is_cuda_lib_available()
 
@@ -33,8 +33,8 @@ def resolve_backend(backend: str) -> str:
     elif backend_lower == "cuda":
         if not is_cuda_native_available():
             raise NotImplementedError(
-                "Native C++/CUDA backend (libcleansar.so) is not compiled or not found. "
-                "Please use backend='pytorch' or compile the CUDA library in clean_sar/backends/c_src/."
+                "Native C++/CUDA backend could not be initialized via NVRTC / CUDA Driver API. "
+                "Please verify NVIDIA drivers and NVRTC runtime libraries, or use backend='pytorch'."
             )
         return "cuda"
     else:

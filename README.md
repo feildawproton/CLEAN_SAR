@@ -13,12 +13,29 @@ Designed for headless execution in cloud and Kubernetes environments with zero m
 ### The Problem
 Traditional radio astronomy CLEAN implementations operate on real-valued, positive intensity maps under the assumption of a shift-invariant PSF. However, SAR imagery presents unique physics:
 1. **Complex Signals ($I + jQ$)**: SAR data contains vital phase information representing target distances, interferometry, and coherent scattering. Deconvolution operates directly in the complex domain.
-2. **Spatially-Varying IPR (PSF)**: In SAR image formation (e.g., Polar Format Algorithm / PFA), converting polar spatial frequencies $(K_r, \theta)$ to Cartesian coordinates $(K_{rg}, K_{az})$ causes the effective spatial frequency support, squint angle, and resolution to vary continuously as a function of scene position $(x, y)$ relative to the Scene Center Point (SCP): $\theta(x_{\text{row}}, y_{\text{col}}) = \arctan\left(\frac{y_{\text{col}}}{R_0 + x_{\text{row}}}\right)$ where $R_0$ is the dynamic slant range from `SCPCOA.SlantRange`.
+2. **Spatially-Varying IPR (PSF)**: In SAR image formation (e.g., Polar Format Algorithm / PFA), converting polar spatial frequencies $(K_r, \theta)$ to Cartesian coordinates $(K_{rg}, K_{az})$ causes the effective spatial frequency support, squint angle, and resolution to vary continuously as a function of scene position $(x, y)$ relative to the Scene Center Point (SCP):
+   $$\theta(x_{\text{row}}, y_{\text{col}}) = \arctan\left(\frac{y_{\text{col}}}{R_0 + x_{\text{row}}}\right)$$
+   where $R_0$ is the dynamic slant range from `SCPCOA.SlantRange`.
+   - **Spaceborne Regime**: At spaceborne ranges ($R_0 \sim 500\text{--}800\text{ km}$), angular variation across the scene is a modest $\sim 0.26\%$ effect.
+   - **Airborne Regime**: At short airborne ranges ($R_0 \sim 10\text{--}30\text{ km}$), angular variation reaches $5\text{--}25\%$, making exact spatially-varying IPR rotation indispensable.
+   - *Note on defocus*: Wide-angle PFA wavefront-curvature phase errors away from the SCP are addressed during formation/refocusing (e.g., DiffPFA); CLEAN_SAR accounts for the exact rigid spatial rotation of the resulting IPR.
 3. **Format Standardization**: Native compliance with the official NGA **NITF SICD standard** using SARkit.
 
 ---
 
-## 2. Quickstart Demo
+## 2. Backend Capabilities & Support Matrix
+
+| Feature / Option | PyTorch GPU (`pytorch`) | Native CUDA GPU (`cuda`) | Notes |
+| :--- | :---: | :---: | :--- |
+| **Gaussian Restoring Beam** | Yes | Yes | Matched to 3 dB half-power width ($\text{FWHM} = \text{ImpRespWid}$) |
+| **Mainlobe Restoring Beam** | Yes | *Planned* (`NotImplementedError`) | First-null contour mask; abrupt boundary |
+| **Arbitrary Clean Mask** | Yes | *Planned* (`NotImplementedError`) | Constrains component search to ROI |
+| **Weighting Windows** | Uniform, Taylor, Hamming, Hann | Uniform, Taylor, Hamming, Hann | Fused on-chip analytic evaluation in CUDA |
+| **JIT Architecture** | PyTorch / LibTorch | Dynamic NVRTC (`compute_XX`) | Autodetects GPU compute capability |
+
+---
+
+## 3. Quickstart Demo
 
 You can run the out-of-the-box demo with pre-configured default paths for the **`2023-11-14-03-38-20_UMBRA-04`** dataset (evaluating both raw Umbra and DiffPFA outputs):
 
@@ -37,7 +54,7 @@ Output products (deconvolved NITF files and 6-panel dB comparison plots) are sav
 
 ---
 
-## 3. Python API (`CLEANProcessor`)
+## 4. Python API (`CLEANProcessor`)
 
 The primary interface is **`CLEANProcessor`**, which encapsulates SICD loading, chip/scene management, exact PSF dispatch, deconvolution, and NITF writing:
 
@@ -68,7 +85,7 @@ print(f"Iterations: {result.iterations}, Suppression: {result.suppression_db:.1f
 
 ---
 
-## 4. General CLI Usage
+## 5. General CLI Usage
 
 For processing arbitrary SICD NITF files from the terminal:
 
@@ -104,10 +121,11 @@ python -m clean_sar.cli \
 
 ---
 
-## 5. Tools & Utilities (`tools/`)
+## 6. Tools & Utilities (`tools/`)
 
 | Script | Purpose |
 | :--- | :--- |
+| **`benchmark_pytorch_vs_cuda.py`** | Head-to-head PyTorch vs. Native CUDA benchmark with warmup and median timing. |
 | **`run_benchmark.py`** | Batch full-scene benchmarking across an entire directory of SICDs. |
 | **`tools/compare_sicd.py`** | Compares dirty vs. clean SICD NITFs and renders 6-panel dB plots. |
 | **`tools/render_benchmark_plots.py`** | Renders multi-panel full scene overview + native resolution zoom plots. |
@@ -116,7 +134,7 @@ python -m clean_sar.cli \
 
 ---
 
-## 6. Installation & Optional Dependencies
+## 7. Installation & Optional Dependencies
 
 Core requirements are minimal for headless environments (no graphics libraries required):
 ```bash
@@ -130,7 +148,7 @@ pip install ".[viz]"
 
 ---
 
-## 7. Running Tests
+## 8. Running Tests
 
 Run the complete test suite using pytest:
 
@@ -138,8 +156,15 @@ Run the complete test suite using pytest:
 pytest -v tests/
 ```
 
+To run against a custom directory of NITF SICD files:
+```bash
+CLEAN_SAR_TEST_DATA=/path/to/sicd/dir pytest -v tests/
+```
+
+If no test NITF files or no CUDA GPU are detected, dataset-dependent and CUDA-specific tests automatically skip cleanly with descriptive messages.
+
 ---
 
-## 8. License
+## 9. License
 
 MIT License

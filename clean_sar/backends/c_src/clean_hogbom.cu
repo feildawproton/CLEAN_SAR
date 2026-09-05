@@ -43,10 +43,10 @@ __device__ __forceinline__ float eval_1d_window_sinc(float pos, float bw, int wg
              + f1 * (dev_sinc(x - 1.0f) + dev_sinc(x + 1.0f))
              + f2 * (dev_sinc(x - 2.0f) + dev_sinc(x + 2.0f))
              + f3 * (dev_sinc(x - 3.0f) + dev_sinc(x + 3.0f));
-    } else if (wgt_type == 2) { // HAMMING
-        return 0.54f * dev_sinc(x) + 0.23f * (dev_sinc(x - 1.0f) + dev_sinc(x + 1.0f));
-    } else if (wgt_type == 3) { // HANN
-        return 0.50f * dev_sinc(x) + 0.25f * (dev_sinc(x - 1.0f) + dev_sinc(x + 1.0f));
+    } else if (wgt_type == 2) { // HAMMING (normalized to 1.0 at center: / 0.54)
+        return (0.54f * dev_sinc(x) + 0.23f * (dev_sinc(x - 1.0f) + dev_sinc(x + 1.0f))) * (1.0f / 0.54f);
+    } else if (wgt_type == 3) { // HANN (normalized to 1.0 at center: / 0.50)
+        return (0.50f * dev_sinc(x) + 0.25f * (dev_sinc(x - 1.0f) + dev_sinc(x + 1.0f))) * 2.0f;
     }
     return dev_sinc(x);
 }

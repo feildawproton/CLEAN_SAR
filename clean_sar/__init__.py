@@ -13,6 +13,12 @@ from .utils import (
     get_1d_window,
     get_2d_window,
 )
+from .quality import (
+    find_bright_targets,
+    ipr_quality,
+    ipr_quality_multi,
+    verdict,
+)
 
 __version__ = "0.2.0"
 __all__ = [
@@ -26,4 +32,8 @@ __all__ = [
     "taylor_window_1d",
     "get_1d_window",
     "get_2d_window",
+    "find_bright_targets",
+    "ipr_quality",
+    "ipr_quality_multi",
+    "verdict",
 ]

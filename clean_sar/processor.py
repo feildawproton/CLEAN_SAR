@@ -101,7 +101,7 @@ class CLEANProcessor:
                 print(f"[*] Reading full scene: {self.handler.num_rows} x {self.handler.num_cols}")
             dirty_image = self.handler.read_full_image()
             custom_xmltree = None
-            chip_origin = (0, 0)
+            chip_origin = None
 
         # 2. Extract plain scalar physics configuration from SICD handler
         config = CleanPhysicsConfig.from_sicd_handler(self.handler, chip_start=chip_origin)

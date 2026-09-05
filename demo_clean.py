@@ -73,17 +73,24 @@ def run_single_demo(
 
     # 3. Render side-by-side diagnostic plot
     print(f"[*] Rendering diagnostic comparison plot: {out_png}")
-    plot_comparison(
-        input_path,
-        out_nitf,
-        chip_bounds=chip_bounds,
-        save_path=out_png,
-        dynamic_range_db=dyn_range,
-    )
+    try:
+        dirty_img, _ = processor.handler.read_chip(*chip_bounds)
+        plot_comparison(
+            dirty_image=dirty_img,
+            clean_image=result.clean_image,
+            residual_image=result.residual_image,
+            restored_model=result.restored_model,
+            output_png=out_png,
+            dyn_range_db=dyn_range,
+            title_suffix=name,
+        )
+    except Exception as e:
+        print(f"[!] Plot generation failed: {e}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="CLEAN_SAR Quick Demo Runner.")
+    parser.add_argument("--target", type=str, default="all", choices=["all", "umbra", "diffpfa"], help="Dataset target to process")
     parser.add_argument("--out_dir", type=str, default="output/demo", help="Output directory")
     parser.add_argument("--backend", type=str, default="auto", choices=["auto", "cuda", "pytorch"], help="Compute backend")
     parser.add_argument("--beam_type", type=str, default="gaussian", choices=["gaussian", "mainlobe"])
@@ -92,12 +99,13 @@ def main():
     parser.add_argument("--threshold", type=float, default=0.02)
     parser.add_argument("--max_iters", type=int, default=2500)
     parser.add_argument("--dyn_range", type=float, default=50.0)
-    parser.add_argument("--skip_umbra", action="store_true")
-    parser.add_argument("--skip_diffpfa", action="store_true")
 
     args = parser.parse_args()
 
-    if not args.skip_umbra:
+    run_umbra = args.target in ("all", "umbra")
+    run_diffpfa = args.target in ("all", "diffpfa")
+
+    if run_umbra:
         run_single_demo(
             name="Raw Umbra 2023-11-14 (Strong Scatterer Point Target)",
             input_path=DEFAULT_UMBRA_PATH,
@@ -112,7 +120,7 @@ def main():
             dyn_range=args.dyn_range,
         )
 
-    if not args.skip_diffpfa:
+    if run_diffpfa:
         run_single_demo(
             name="DiffPFA 2023-11-14 (Refocused Point Target)",
             input_path=DEFAULT_DIFFPFA_PATH,

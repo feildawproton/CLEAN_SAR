@@ -34,10 +34,16 @@ class CleanResult:
         return self.history_peaks[-1] if self.history_peaks else 0.0
 
     @property
-    def suppression_db(self) -> float:
+    def peak_reduction_db(self) -> float:
+        """Peak-residual reduction: 20*log10(initial_peak / final_peak)."""
         if self.initial_peak > 0 and self.final_peak > 0:
             return 20.0 * np.log10(self.initial_peak / self.final_peak)
         return 0.0
+
+    @property
+    def suppression_db(self) -> float:
+        """Alias for peak_reduction_db for backward compatibility."""
+        return self.peak_reduction_db
 
     @property
     def num_components(self) -> int:

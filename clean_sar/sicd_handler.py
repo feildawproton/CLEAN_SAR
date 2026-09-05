@@ -1,5 +1,6 @@
 import os
 import copy
+import warnings
 import lxml.etree as etree
 import numpy as np
 from typing import Optional, Tuple, Dict, Any, Union
@@ -93,6 +94,48 @@ class SICDHandler:
 
         # RMA metadata (if available)
         self.is_rma = self.xmltree.find("{*}RMA") is not None
+
+        # Validate ImpRespWid vs ImpRespBW consistency (C12)
+        self._validate_impresp()
+
+    def _validate_impresp(self):
+        """
+        Validate ImpRespWid * ImpRespBW against expected broadening factor k.
+        Standard SICD defines ImpRespWid as the half-power (3 dB) width,
+        where k = ImpRespWid * ImpRespBW (0.886 for uniform, 1.125 for Taylor,
+        1.303 for Hamming, 1.441 for Hann).
+        DiffPFA or non-standard writers may declare 1/BW (Rayleigh width) instead of 0.886/BW.
+        Warns on significant mismatch (>5%) while preserving declared metadata.
+        """
+        k_expected = {
+            "UNIFORM": 0.886,
+            "TAYLOR": 1.125,
+            "HAMMING": 1.303,
+            "HANN": 1.441,
+        }
+        for axis, wid, bw, wgt in [
+            ("Row", self.row_wid, self.row_bw, self.row_wgt_name),
+            ("Col", self.col_wid, self.col_bw, self.col_wgt_name),
+        ]:
+            if wid > 0 and bw > 0:
+                k_actual = wid * bw
+                w_str = str(wgt).strip().upper() if wgt else "UNIFORM"
+                expected = None
+                for k_name, k_val in k_expected.items():
+                    if k_name in w_str:
+                        expected = k_val
+                        break
+                if expected is not None:
+                    rel_err = abs(k_actual - expected) / expected
+                    if rel_err > 0.05:
+                        warnings.warn(
+                            f"SICD {axis} declared ImpRespWid={wid:.6f} m and ImpRespBW={bw:.6f} cyc/m "
+                            f"(broadening factor k={k_actual:.4f}). Expected k~{expected:.4f} for {w_str} window. "
+                            f"Metadata may declare Rayleigh resolution (1/BW) rather than SICD standard "
+                            f"half-power width (0.886/BW). Proceeding with declared values.",
+                            UserWarning,
+                            stacklevel=3,
+                        )
 
     def read_full_image(self) -> np.ndarray:
         """
@@ -216,6 +259,16 @@ class SICDHandler:
             num_rows_elem.text = str(complex_image.shape[0])
         if num_cols_elem is not None:
             num_cols_elem.text = str(complex_image.shape[1])
+
+        # Update provenance in ImageCreation metadata (C15)
+        import datetime
+        now_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        app_elem = xml.find("{*}ImageCreation/{*}Application")
+        dt_elem = xml.find("{*}ImageCreation/{*}DateTime")
+        if app_elem is not None:
+            app_elem.text = "CLEAN_SAR (Complex Hogbom Deconvolution)"
+        if dt_elem is not None:
+            dt_elem.text = now_utc
 
         sec = ss.NitfSecurityFields(clas="U")
         meta = ss.NitfMetadata(

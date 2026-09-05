@@ -5,22 +5,12 @@ import numpy as np
 from clean_sar import CLEANProcessor, SICDHandler
 
 
-def get_test_sicd():
-    files = sorted(glob.glob("/home/feildaw/data/*.nitf"))
-    if not files:
-        files = sorted(glob.glob("/home/feildaw/diffpfa/workspace/output/*.nitf"))
-    return files[0] if files else None
-
-
-def test_clean_processor_chip(tmp_path):
-    input_file = get_test_sicd()
-    assert input_file is not None, "No test SICD file found."
-
+def test_clean_processor_chip(tmp_path, test_sicd_path):
     out_file = str(tmp_path / "test_chip_clean.nitf")
     chip_bounds = (100, 100, 228, 228)
 
     proc = CLEANProcessor(
-        input_path=input_file,
+        input_path=test_sicd_path,
         output_path=out_file,
         chip_bounds=chip_bounds,
     )
