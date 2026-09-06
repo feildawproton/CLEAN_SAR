@@ -20,10 +20,7 @@ def benchmark_single_sicd(
     gain: float = 0.1,
     threshold: float = 0.02,
     backend: str = "auto",
-    beam_type: str = "gaussian",
-    psf_size: int = 65,
     guard_margin: int = 0,
-    device: str = None,
 ) -> Dict[str, Any]:
     """
     Executes full-scene CLEAN deconvolution on a single NITF SICD and records granular timings and metrics.
@@ -34,7 +31,7 @@ def benchmark_single_sicd(
     print(f"\n{'='*75}")
     print(f"  [BENCHMARK] Processing full scene: {os.path.basename(input_path)}")
     print(f"  Output:    {out_path}")
-    print(f"  Backend:   {backend.upper()} | Beam: {beam_type.upper()}")
+    print(f"  Backend:   {backend.upper()}")
     print(f"  Gain:      {gain} | Threshold: {threshold} | Max Iters: {max_iters}")
     print(f"{'='*75}")
 
@@ -43,9 +40,7 @@ def benchmark_single_sicd(
     processor = CLEANProcessor(
         input_path=input_path,
         output_path=out_path,
-        chip_bounds=None,  # Full scene, no chipping
         backend=backend,
-        device=device,
     )
 
     t0_read = time.perf_counter()
@@ -65,13 +60,10 @@ def benchmark_single_sicd(
         dirty_image=dirty_image,
         config=config,
         backend=backend,
-        beam_type=beam_type,
-        psf_size=psf_size,
         gain=gain,
         threshold=threshold,
         max_iters=max_iters,
         guard_margin=guard_margin,
-        device=processor.device,
         verbose=True,
     )
     clean_proc_time = time.perf_counter() - t0_clean
@@ -165,14 +157,11 @@ def main():
     parser.add_argument("--input_dir", type=str, required=True, help="Directory containing input .nitf SICD files.")
     parser.add_argument("--output_dir", type=str, default="output/benchmarks", help="Directory to save clean SICDs and benchmark metrics.")
     parser.add_argument("--pattern", type=str, default="*.nitf", help="Glob pattern for selecting files (default: '*.nitf').")
-    parser.add_argument("--backend", choices=["auto", "pytorch", "cuda"], default="auto", help="Compute backend (default: 'auto').")
-    parser.add_argument("--beam", choices=["gaussian", "mainlobe"], default="gaussian", help="Restoring beam type (default: 'gaussian').")
+    parser.add_argument("--backend", choices=["auto", "cuda", "c"], default="auto", help="Compute backend (default: 'auto').")
     parser.add_argument("--gain", type=float, default=0.1, help="CLEAN loop gain gamma (default: 0.1).")
     parser.add_argument("--threshold", type=float, default=0.02, help="Stopping threshold fraction (default: 0.02).")
-    parser.add_argument("--max_iters", type=int, default=2500, help="Maximum iterations per scene (default: 2500).")
-    parser.add_argument("--psf_size", type=int, default=65, help="Kernel dimension for local PSF (default: 65).")
+    parser.add_argument("--max-iters", type=int, default=2500, help="Maximum iterations per scene (default: 2500).")
     parser.add_argument("--guard_margin", type=int, default=0, help="Border exclusion margin in pixels (default: 0).")
-    parser.add_argument("--device", type=str, default=None, help="Device to use ('cuda' or 'cpu').")
     parser.add_argument("--limit", type=int, default=None, help="Optional limit on number of files to process.")
 
     args = parser.parse_args()
@@ -198,10 +187,7 @@ def main():
                 gain=args.gain,
                 threshold=args.threshold,
                 backend=args.backend,
-                beam_type=args.beam,
-                psf_size=args.psf_size,
                 guard_margin=args.guard_margin,
-                device=args.device,
             )
             all_results.append(res)
         except Exception as e:

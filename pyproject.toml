@@ -9,7 +9,6 @@ description = "Complex SAR Hogbom CLEAN Deconvolution with Spatially-Varying IPR
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "torch>=2.0.0",
     "numpy",
     "scipy",
     "sarkit",
@@ -27,3 +26,11 @@ clean-sar = "clean_sar.cli:main"
 where = ["."]
 include = ["clean_sar*"]
 exclude = ["tests*", "tools*", "output*", "scratch*", "audit*", "docs*"]
+
+[tool.setuptools.package-data]
+"clean_sar.backends" = ["c_src/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+

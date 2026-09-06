@@ -41,14 +41,11 @@ def test_clean_beam_generation(handler):
     psf_gen = PSFGenerator(config)
 
     scp_r, scp_c = handler.scp_pixel
-    beam_gauss = psf_gen.compute_clean_beam(scp_r, scp_c, psf_size=65, beam_type="gaussian")
-    beam_main = psf_gen.compute_clean_beam(scp_r, scp_c, psf_size=65, beam_type="mainlobe")
+    beam = psf_gen.compute_clean_beam(scp_r, scp_c, psf_size=65)
 
-    assert beam_gauss.shape == (65, 65)
-    assert beam_main.shape == (65, 65)
+    assert beam.shape == (65, 65)
     kh = 65 // 2
-    assert np.isclose(np.abs(beam_gauss[kh, kh]), 1.0, atol=1e-5)
-    assert np.isclose(np.abs(beam_main[kh, kh]), 1.0, atol=1e-5)
+    assert np.isclose(np.abs(beam[kh, kh]), 1.0, atol=1e-5)
 
 
 def test_slant_range_comes_from_scpcoa(handler):
@@ -68,7 +65,7 @@ def test_gaussian_beam_halfpower_width_matches_imprespwid(bw):
 
     n = 129
     c = n // 2
-    beam = np.abs(gen.compute_clean_beam(0, 0, psf_size=n, beam_type="gaussian"))
+    beam = np.abs(gen.compute_clean_beam(0, 0, psf_size=n))
 
     assert beam[c, c] == pytest.approx(1.0, abs=1e-6)
 
@@ -151,12 +148,28 @@ def test_psf_peak_is_unity(wgt):
     assert np.abs(psf[32, 32]) == pytest.approx(1.0, abs=1e-6)
 
 
-def test_psf_lru_cache(handler):
+def test_calculate_psf_size_properties(handler):
+    from clean_sar.psf import calculate_psf_size
     config = CleanPhysicsConfig.from_sicd_handler(handler)
-    psf_gen = PSFGenerator(config, max_cache_size=5)
 
-    for i in range(10):
-        d_t, c_t = psf_gen.get_psfs_torch(row=100 + i, col=100 + i, psf_size=33)
+    # 1. Output must be odd
+    size = calculate_psf_size(config, image_shape=(512, 512))
+    assert size % 2 == 1
+    assert size >= 15
 
-    assert len(psf_gen._cache_dirty) <= 5
-    assert len(psf_gen._cache_clean) <= 5
+    # 2. Must not exceed image dimensions
+    size_bounded = calculate_psf_size(config, image_shape=(64, 64))
+    assert size_bounded <= 64
+    assert size_bounded % 2 == 1
+
+    size_small = calculate_psf_size(config, image_shape=(32, 40))
+    assert size_small <= 32
+    assert size_small % 2 == 1
+
+    # 3. Windowed PSF has faster decay and thus smaller or equal grid size than uniform
+    cfg_taylor = CleanPhysicsConfig.from_sicd_handler(handler)
+    cfg_taylor.row_wgt = "TAYLOR"
+    cfg_taylor.col_wgt = "TAYLOR"
+    size_taylor = calculate_psf_size(cfg_taylor, image_shape=(512, 512))
+    assert size_taylor <= size
+

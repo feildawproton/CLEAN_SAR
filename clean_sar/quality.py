@@ -1,9 +1,9 @@
 """
-audit/claude_code_opus_5/quality_metrics.py
+clean_sar/quality.py: IPR quality, target preservation, and annulus ISLR metrics for CLEAN SAR.
 
-Drop-in reference implementation of the two metrics recommended in F2 of the
-audit report. Depends only on numpy. Intended to be lifted into
-clean_sar/ (e.g. as clean_sar/quality.py) more or less verbatim.
+Provides discriminating quality metrics for evaluating SAR deconvolution performance:
+1. mainlobe_preservation: verifies scatterer amplitude is not eroded.
+2. islr_change_db: measures integrated sidelobe energy suppression in an annulus around the scatterer.
 
 WHY THESE TWO
 -------------

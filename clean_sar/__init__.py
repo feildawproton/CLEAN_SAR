@@ -5,7 +5,7 @@ CLEAN_SAR: Complex SAR Hogbom CLEAN Deconvolution with Exact Spatially-Varying I
 from .processor import CLEANProcessor
 from .config import CleanPhysicsConfig
 from .algorithm import run_hogbom_clean, CleanResult
-from .psf import PSFGenerator
+from .psf import PSFGenerator, calculate_psf_size
 from .sicd_handler import SICDHandler
 from .utils import (
     db_scale,
@@ -27,6 +27,7 @@ __all__ = [
     "run_hogbom_clean",
     "CleanResult",
     "PSFGenerator",
+    "calculate_psf_size",
     "SICDHandler",
     "db_scale",
     "taylor_window_1d",

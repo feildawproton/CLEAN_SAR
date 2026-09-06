@@ -17,6 +17,17 @@ def chip_and_config(test_sicd_path):
     return chip, cfg
 
 
+@pytest.fixture(scope="module")
+def chip_sicd_file(tmp_path_factory, test_sicd_path):
+    """Creates a standalone SICD chip file for processor end-to-end tests."""
+    tmp_dir = tmp_path_factory.mktemp("sicd_chip")
+    chip_path = str(tmp_dir / "chip_128x128.nitf")
+    h = SICDHandler(test_sicd_path)
+    chip_arr, chip_xml = h.read_chip(2000, 4000, 2128, 4128)
+    h.write_nitf(chip_path, chip_arr, custom_xmltree=chip_xml)
+    return chip_path
+
+
 def _with_weighting(cfg, wgt):
     d = dict(cfg.__dict__)
     d.update(row_wgt=wgt, col_wgt=wgt)
@@ -24,7 +35,7 @@ def _with_weighting(cfg, wgt):
 
 
 def _run(chip, cfg, backend, **kw):
-    kwargs = dict(beam_type="gaussian", psf_size=65, gain=0.1,
+    kwargs = dict(gain=0.1,
                   threshold=0.02, max_iters=200, verbose=False)
     kwargs.update(kw)
     return run_hogbom_clean(dirty_image=chip, config=cfg, backend=backend, **kwargs)
@@ -34,8 +45,9 @@ def test_resolve_backend_logic():
     if is_cuda_native_available():
         assert resolve_backend("auto") == "cuda"
     else:
-        assert resolve_backend("auto") == "pytorch"
-    assert resolve_backend("pytorch") == "pytorch"
+        assert resolve_backend("auto") == "c"
+    assert resolve_backend("c") == "c"
+    assert resolve_backend("cpu") == "c"
     assert resolve_backend("cuda") == "cuda"
 
     with pytest.raises(ValueError, match="Unknown backend"):
@@ -43,7 +55,7 @@ def test_resolve_backend_logic():
 
 
 # --------------------------------------------------------------------------
-# 1. Array-level parity across EVERY supported weighting
+# 1. Array-level parity across EVERY supported weighting (CUDA vs C fallback)
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("wgt", ["UNIFORM", "TAYLOR", "HAMMING", "HANN"])
 def test_backend_parity_arrays(chip_and_config, wgt):
@@ -52,27 +64,27 @@ def test_backend_parity_arrays(chip_and_config, wgt):
     chip, base = chip_and_config
     cfg = _with_weighting(base, wgt)
 
-    rt = _run(chip, cfg, "pytorch")
-    rc = _run(chip, cfg, "cuda")
+    r_c = _run(chip, cfg, "c")
+    r_cuda = _run(chip, cfg, "cuda")
 
-    assert rt.iterations == rc.iterations, (
-        f"[{wgt}] iteration count differs: pytorch={rt.iterations} cuda={rc.iterations}"
+    assert r_c.iterations == r_cuda.iterations, (
+        f"[{wgt}] iteration count differs: c={r_c.iterations} cuda={r_cuda.iterations}"
     )
 
     # Peak selection must match step for step
-    n = min(len(rt.history_coords), len(rc.history_coords))
-    first_div = next((i for i in range(n) if rt.history_coords[i] != rc.history_coords[i]), None)
+    n = min(len(r_c.history_coords), len(r_cuda.history_coords))
+    first_div = next((i for i in range(n) if r_c.history_coords[i] != r_cuda.history_coords[i]), None)
     assert first_div is None, (
         f"[{wgt}] peak selection diverges at iteration {first_div}: "
-        f"pytorch={rt.history_coords[first_div]} cuda={rc.history_coords[first_div]}"
+        f"c={r_c.history_coords[first_div]} cuda={r_cuda.history_coords[first_div]}"
     )
 
     # Check all output arrays to high precision
     for field in ("clean_image", "residual_image", "components_map", "restored_model"):
-        a, b = getattr(rt, field), getattr(rc, field)
+        a, b = getattr(r_c, field), getattr(r_cuda, field)
         peak = float(np.max(np.abs(a))) or 1.0
         err = float(np.max(np.abs(a - b))) / peak
-        assert err < 1e-5, f"[{wgt}] {field}: max|torch-cuda|/peak = {err:.3e}"
+        assert err < 1e-5, f"[{wgt}] {field}: max|c-cuda|/peak = {err:.3e}"
 
 
 # --------------------------------------------------------------------------
@@ -91,14 +103,6 @@ def test_psf_peak_is_unity(chip_and_config, wgt):
 # --------------------------------------------------------------------------
 # 3. Options must be honoured or refused -- never silently substituted
 # --------------------------------------------------------------------------
-def test_cuda_rejects_mainlobe_beam(chip_and_config):
-    if not is_cuda_native_available():
-        pytest.skip("CUDA native driver not available")
-    chip, cfg = chip_and_config
-    with pytest.raises(NotImplementedError, match="beam_type='gaussian'"):
-        _run(chip, cfg, "cuda", beam_type="mainlobe")
-
-
 def test_cuda_rejects_clean_mask(chip_and_config):
     if not is_cuda_native_available():
         pytest.skip("CUDA native driver not available")
@@ -115,20 +119,39 @@ def test_cuda_requires_physics_config(chip_and_config):
     chip, _ = chip_and_config
     with pytest.raises(ValueError, match="CleanPhysicsConfig 'config' must be provided"):
         run_hogbom_clean(dirty_image=chip, config=None, backend="cuda",
-                         psf_size=65, gain=0.1, threshold=0.02,
+                         gain=0.1, threshold=0.02,
                          max_iters=50, verbose=False)
 
 
-def test_processor_with_cuda_backend(tmp_path, test_sicd_path):
+def test_processor_with_cuda_backend(tmp_path, chip_sicd_file):
     if not is_cuda_native_available():
         pytest.skip("CUDA native driver not available")
     out_file = str(tmp_path / "test_cuda_proc.nitf")
 
     proc = CLEANProcessor(
-        input_path=test_sicd_path,
+        input_path=chip_sicd_file,
         output_path=out_file,
-        chip_bounds=(100, 100, 228, 228),
         backend="cuda",
+    )
+
+    res = proc.run(
+        gain=0.1,
+        threshold=0.05,
+        max_iters=100,
+        verbose=False,
+    )
+
+    assert res.iterations > 0
+    assert res.suppression_db > 0.0
+
+
+def test_processor_with_c_backend(tmp_path, chip_sicd_file):
+    out_file = str(tmp_path / "test_c_proc.nitf")
+
+    proc = CLEANProcessor(
+        input_path=chip_sicd_file,
+        output_path=out_file,
+        backend="c",
     )
 
     res = proc.run(

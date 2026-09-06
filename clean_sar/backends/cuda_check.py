@@ -147,7 +147,7 @@ class CudaDriver:
 
     def primary_context(self, dev: c_int) -> c_void_p:
         """
-        Retain the device PRIMARY context (the one PyTorch uses).
+        Retain the device PRIMARY context.
         """
         ctx = c_void_p()
         self.call("cuDevicePrimaryCtxRetain", byref(ctx), dev)

@@ -23,6 +23,7 @@ _CUDA_DRIVER: Optional[CudaDriver] = None
 _CUDA_CTX: Optional[ctypes.c_void_p] = None
 _CUDA_MODULE: Optional[ctypes.c_void_p] = None
 _CUDA_KERNELS: dict = {}
+_CUDA_PTX_ORIGIN: Optional[str] = None  # 'nvcc' or 'nvrtc'
 
 NVRTC_CANDIDATE_PATHS = [
     "/home/feildaw/mypyenv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12",
@@ -34,7 +35,7 @@ NVRTC_CANDIDATE_PATHS = [
 
 
 def _init_cuda_driver() -> bool:
-    global _CUDA_DRIVER, _CUDA_CTX, _CUDA_MODULE, _CUDA_KERNELS
+    global _CUDA_DRIVER, _CUDA_CTX, _CUDA_MODULE, _CUDA_KERNELS, _CUDA_PTX_ORIGIN
 
     if _CUDA_MODULE is not None and _CUDA_DRIVER is not None and _CUDA_CTX is not None:
         _CUDA_DRIVER.call("cuCtxSetCurrent", _CUDA_CTX)
@@ -48,7 +49,7 @@ def _init_cuda_driver() -> bool:
 
     dev = driver.device(0)
 
-    # 2. Retain Primary Context (cooperates with PyTorch and survives context switches)
+    # 2. Retain Primary Context (survives context switches)
     try:
         ctx = driver.primary_context(dev)
     except Exception:
@@ -61,26 +62,38 @@ def _init_cuda_driver() -> bool:
     except Exception:
         arch_flag = b"--gpu-architecture=compute_86"
 
-    # 4. Load NVRTC and compile CUDA source
-    cu_file = os.path.join(os.path.dirname(__file__), "c_src", "clean_hogbom.cu")
-    if not os.path.isfile(cu_file):
-        return False
+    # 4. Check for ahead-of-time compiled PTX (from nvcc at install time) or compile via NVRTC
+    ptx = None
+    precompiled_ptx = os.path.join(os.path.dirname(__file__), "c_src", "clean_hogbom.ptx")
+    if os.path.isfile(precompiled_ptx):
+        try:
+            with open(precompiled_ptx, "rb") as f:
+                ptx = f.read()
+            _CUDA_PTX_ORIGIN = "nvcc"
+        except Exception:
+            ptx = None
 
-    with open(cu_file, "rb") as f:
-        cuda_src = f.read()
+    if ptx is None:
+        cu_file = os.path.join(os.path.dirname(__file__), "c_src", "clean_hogbom.cu")
+        if not os.path.isfile(cu_file):
+            return False
 
-    try:
-        nvrtc = Nvrtc(NVRTC_CANDIDATE_PATHS)
-        ptx = nvrtc.compile_to_ptx(
-            cuda_src,
-            b"clean_hogbom.cu",
-            [b"--std=c++14", arch_flag]
-        )
-    except NvrtcError as err:
-        print(f"[ERROR] NVRTC CUDA compilation failed:\n{err}", file=sys.stderr)
-        return False
-    except Exception:
-        return False
+        with open(cu_file, "rb") as f:
+            cuda_src = f.read()
+
+        try:
+            nvrtc = Nvrtc(NVRTC_CANDIDATE_PATHS)
+            ptx = nvrtc.compile_to_ptx(
+                cuda_src,
+                b"clean_hogbom.cu",
+                [b"--std=c++14", arch_flag]
+            )
+            _CUDA_PTX_ORIGIN = "nvrtc"
+        except NvrtcError as err:
+            print(f"[ERROR] NVRTC CUDA compilation failed:\n{err}", file=sys.stderr)
+            return False
+        except Exception:
+            return False
 
     # 5. Load PTX Module
     module = ctypes.c_void_p()
@@ -112,8 +125,15 @@ def _init_cuda_driver() -> bool:
     return True
 
 
+def get_cuda_compilation_mode() -> Optional[str]:
+    """Returns 'nvcc' if using precompiled PTX, 'nvrtc' if using JIT, or None if unavailable."""
+    if _CUDA_MODULE is None:
+        _init_cuda_driver()
+    return _CUDA_PTX_ORIGIN
+
+
 def is_cuda_lib_available() -> bool:
-    """Returns True if the native CUDA NVRTC driver and module are initialized and ready."""
+    """Returns True if the native CUDA driver and module are initialized and ready."""
     return _init_cuda_driver()
 
 
@@ -124,15 +144,12 @@ def is_cuda_lib_available() -> bool:
 def run_hogbom_cuda_native(
     dirty_image: np.ndarray,
     config: Optional[CleanPhysicsConfig] = None,
-    psf_generator=None,
-    beam_type: Literal["gaussian", "mainlobe"] = "gaussian",
     psf_size: int = 65,
     gain: float = 0.1,
     threshold: float = 0.02,
     max_iters: int = 2500,
     clean_mask: Optional[np.ndarray] = None,
     guard_margin: int = 0,
-    device=None,
     verbose: bool = False,
 ):
     """
@@ -144,23 +161,8 @@ def run_hogbom_cuda_native(
     if config is None:
         raise ValueError("CleanPhysicsConfig 'config' must be provided for the native CUDA backend.")
 
-    if beam_type != "gaussian":
-        raise NotImplementedError(
-            f"Native CUDA backend currently only supports beam_type='gaussian' (got '{beam_type}'). "
-            "Please use backend='pytorch' for 'mainlobe' restoring beam."
-        )
-
     if clean_mask is not None:
-        raise NotImplementedError(
-            "Native CUDA backend does not currently support 'clean_mask'. "
-            "Please use backend='pytorch' for masked CLEAN deconvolution."
-        )
-
-    if psf_generator is not None:
-        raise NotImplementedError(
-            "Native CUDA backend evaluates the analytic PSF directly in-kernel and does not accept "
-            "an external 'psf_generator'. Please pass 'config' (CleanPhysicsConfig), or use backend='pytorch'."
-        )
+        raise NotImplementedError("Native CUDA backend does not currently support 'clean_mask'.")
 
     if not _init_cuda_driver():
         raise NotImplementedError(
@@ -264,8 +266,9 @@ def run_hogbom_cuda_native(
 
         if verbose:
             origin_str = f"origin ({config.chip_start_row}, {config.chip_start_col})"
+            mode_str = "Precompiled PTX via nvcc" if _CUDA_PTX_ORIGIN == "nvcc" else "JIT via libnvrtc"
             print(f"[CLEAN] Initial peak: {init_peak:.4e}, Stopping threshold: {stop_thresh:.4e}, Max iters: {max_iters} ({origin_str})")
-            print(f"        Backend: CUDA (Native C++/NVRTC) | Beam: GAUSSIAN | PSF size: {psf_size}x{psf_size}")
+            print(f"        Backend: CUDA ({mode_str}) | PSF size: {psf_size}x{psf_size}")
 
         h_peak_complex = (ctypes.c_float * 2)()
         history_peaks: List[float] = []

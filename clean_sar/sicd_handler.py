@@ -252,7 +252,6 @@ class SICDHandler:
         xml = copy.deepcopy(custom_xmltree if custom_xmltree is not None else self.xmltree)
 
         # Ensure XML image dimensions match the array
-        xh = ss.XmlHelper(xml)
         num_rows_elem = xml.find("{*}ImageData/{*}NumRows")
         num_cols_elem = xml.find("{*}ImageData/{*}NumCols")
         if num_rows_elem is not None:

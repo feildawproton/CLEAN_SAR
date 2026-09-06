@@ -9,20 +9,18 @@ import pytest
 from clean_sar.algorithm import run_hogbom_clean
 from clean_sar.backends import is_cuda_native_available
 from clean_sar.config import CleanPhysicsConfig
-from clean_sar.psf import PSFGenerator
+from clean_sar.psf import PSFGenerator, calculate_psf_size
 
 N = 128
-PSF_SIZE = 65
-KH = PSF_SIZE // 2
 
-# (row, col, complex amplitude); all at least KH from every edge
+# (row, col, complex amplitude)
 TARGETS = [
     (40, 45, 1.00 + 0.00j),
     (64, 64, 0.60 - 0.30j),
     (90, 85, 0.35 + 0.20j),
 ]
 
-BACKENDS = ["pytorch"] + (["cuda"] if is_cuda_native_available() else [])
+BACKENDS = ["c"] + (["cuda"] if is_cuda_native_available() else [])
 
 
 def _config(wgt="UNIFORM"):
@@ -45,18 +43,26 @@ def scene():
     """
     cfg = _config()
     gen = PSFGenerator(cfg)
+    psf_sz = calculate_psf_size(cfg, (N, N))
+    kh = psf_sz // 2
+
     dirty = np.zeros((N, N), dtype=np.complex64)
     for (r, c, a) in TARGETS:
-        dirty[r - KH:r + KH + 1, c - KH:c + KH + 1] += a * gen.compute_psf(
-            r, c, psf_size=PSF_SIZE
-        )
+        p = gen.compute_psf(r, c, psf_size=psf_sz)
+        r0, r1 = max(0, r - kh), min(N, r + kh + 1)
+        c0, c1 = max(0, c - kh), min(N, c + kh + 1)
+        pr0 = r0 - (r - kh)
+        pr1 = pr0 + (r1 - r0)
+        pc0 = c0 - (c - kh)
+        pc1 = pc0 + (c1 - c0)
+        dirty[r0:r1, c0:c1] += a * p[pr0:pr1, pc0:pc1]
     return dirty, cfg
 
 
 def _clean(dirty, cfg, backend):
     return run_hogbom_clean(
-        dirty_image=dirty, config=cfg, backend=backend, beam_type="gaussian",
-        psf_size=PSF_SIZE, gain=0.1, threshold=0.001, max_iters=6000,
+        dirty_image=dirty, config=cfg, backend=backend,
+        gain=0.1, threshold=0.001, max_iters=6000,
         verbose=False,
     )
 
@@ -136,9 +142,9 @@ def test_residual_is_driven_to_threshold(scene, backend):
 def test_backends_agree_on_synthetic_scene(scene):
     dirty, cfg = scene
     scale = float(np.max(np.abs(dirty)))
-    rt = _clean(dirty, cfg, "pytorch")
+    r_c = _clean(dirty, cfg, "c")
     rc = _clean(dirty, cfg, "cuda")
     for field in ("clean_image", "residual_image", "components_map", "restored_model"):
-        a, b = getattr(rt, field), getattr(rc, field)
+        a, b = getattr(r_c, field), getattr(rc, field)
         err = float(np.max(np.abs(a - b))) / scale
-        assert err < 1e-5, f"{field}: max|torch-cuda|/scene_peak = {err:.3e}"
+        assert err < 1e-5, f"{field}: max|c-cuda|/scene_peak = {err:.3e}"

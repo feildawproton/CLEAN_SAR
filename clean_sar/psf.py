@@ -1,8 +1,98 @@
 import numpy as np
-import torch
-from collections import OrderedDict
-from typing import Optional, Tuple, Union, Literal
+from typing import Optional, Tuple, Union
 from .config import CleanPhysicsConfig
+
+
+def calculate_psf_size(
+    config: CleanPhysicsConfig,
+    image_shape: Optional[Tuple[int, int]] = None,
+    target_power: float = 0.999,
+    min_size: int = 15,
+) -> int:
+    """
+    Calculates the optimal odd PSF grid size based on the integrated power
+    of the continuous analytic dirty PSF for the given radar physics configuration,
+    with maximum size bounded by the incoming image dimensions.
+
+    Parameters
+    ----------
+    config : CleanPhysicsConfig
+        Radar physics configuration containing sampling, bandwidth, and weighting.
+    image_shape : tuple of (int, int), optional
+        Shape (H, W) of the incoming image to enforce maximum grid size constraint.
+    target_power : float, default 0.999
+        Fraction of total discrete PSF power enclosed by the kernel window (e.g. 99.9%).
+    min_size : int, default 15
+        Minimum allowable kernel dimension (ensures coverage of mainlobe and first sidelobes).
+
+    Returns
+    -------
+    int
+        Odd integer kernel size.
+    """
+    sizes = []
+    for ss, bw, wid, wgt in [
+        (config.row_ss, config.row_bw, config.row_wid, config.row_wgt),
+        (config.col_ss, config.col_bw, config.col_wid, config.col_wgt),
+    ]:
+        w_str = (wgt or "UNIFORM").upper()
+        max_r = 512
+        if image_shape is not None:
+            max_r = min(max_r, max(image_shape) // 2)
+        r_grid = np.arange(0, max_r + 1, dtype=np.float32)
+        u = r_grid * float(ss)
+        x = float(bw) * u
+
+        sinc_x = np.sinc(x)
+        if w_str in ["UNIFORM", "RECT", "RECTANGULAR", "NONE"]:
+            pat = sinc_x
+        elif "TAYLOR" in w_str:
+            f1, f2, f3 = 0.29265601, -0.01578375, 0.00218104
+            pat = (
+                sinc_x
+                + f1 * (np.sinc(x - 1.0) + np.sinc(x + 1.0))
+                + f2 * (np.sinc(x - 2.0) + np.sinc(x + 2.0))
+                + f3 * (np.sinc(x - 3.0) + np.sinc(x + 3.0))
+            )
+        elif "HAMMING" in w_str:
+            pat = (0.54 * sinc_x + 0.23 * (np.sinc(x - 1.0) + np.sinc(x + 1.0))) * (1.0 / 0.54)
+        elif "HANN" in w_str:
+            pat = (0.50 * sinc_x + 0.25 * (np.sinc(x - 1.0) + np.sinc(x + 1.0))) * 2.0
+        else:
+            pat = sinc_x
+
+        pwr = pat ** 2
+        tot_pwr = pwr[0] + 2.0 * np.sum(pwr[1:])
+        if tot_pwr > 0:
+            cum_pwr = pwr[0] + 2.0 * np.cumsum(pwr[1:])
+            frac = cum_pwr / tot_pwr
+            rad = int(np.searchsorted(frac, target_power)) + 1
+        else:
+            rad = 16
+
+        # Ensure at least 3 resolution cells to capture mainlobe and first sidelobes
+        if ss > 0 and wid > 0:
+            res_cells = int(np.ceil(float(wid) / float(ss)))
+            rad = max(rad, res_cells * 3)
+
+        sizes.append(2 * rad + 1)
+
+    grid_size = max(sizes)
+    if min_size:
+        grid_size = max(grid_size, min_size)
+
+    # Maximum size bounded by the incoming image dimensions
+    if image_shape is not None and len(image_shape) >= 2:
+        max_dim = min(image_shape[0], image_shape[1])
+        if max_dim % 2 == 0:
+            max_dim -= 1
+        max_dim = max(max_dim, 3)
+        grid_size = min(grid_size, max_dim)
+
+    if grid_size % 2 == 0:
+        grid_size += 1
+
+    return grid_size
 
 
 class PSFGenerator:
@@ -14,16 +104,12 @@ class PSFGenerator:
     polar shear angle rotation, and aperture weighting.
     """
 
-    def __init__(self, config: CleanPhysicsConfig, max_cache_size: int = 4096):
+    def __init__(self, config: CleanPhysicsConfig):
         self.config = config
-        self.max_cache_size = max_cache_size
-        self._cache_dirty: OrderedDict[Tuple, torch.Tensor] = OrderedDict()
-        self._cache_clean: OrderedDict[Tuple, torch.Tensor] = OrderedDict()
 
     def clear_cache(self):
-        """Clears precomputed PSF tensors from memory."""
-        self._cache_dirty.clear()
-        self._cache_clean.clear()
+        """Clears precomputed PSF arrays from memory (no-op retained for backward compatibility)."""
+        pass
 
     def _get_metric_coords(
         self,
@@ -104,7 +190,6 @@ class PSFGenerator:
                     + 0.25 * np.sinc(bw * pos + 1.0)
                 )
             elif wgt == "TAYLOR":
-                # Standard Taylor window (nbar=4, SLL=-30dB)
                 fm = [0.29265601, -0.01578375, 0.00218104]
                 pat = np.sinc(bw * pos)
                 for m_idx, coeff in enumerate(fm, start=1):
@@ -133,32 +218,12 @@ class PSFGenerator:
         row: Union[int, float],
         col: Union[int, float],
         psf_size: int = 65,
-        beam_type: Literal["gaussian", "mainlobe"] = "gaussian",
     ) -> np.ndarray:
         """
-        Computes the local clean restoring beam (matched 3dB Gaussian or dirty mainlobe).
+        Computes the local clean restoring beam (matched 3dB Gaussian).
         """
         if psf_size % 2 == 0:
             psf_size += 1
-
-        if beam_type == "mainlobe":
-            dirty = self.compute_psf(row, col, psf_size=psf_size)
-            center = psf_size // 2
-            beam = np.zeros_like(dirty, dtype=np.complex64)
-            beam[center, center] = 1.0 + 0j
-            visited = np.zeros((psf_size, psf_size), dtype=bool)
-            visited[center, center] = True
-            queue = [(center, center)]
-            while queue:
-                r, c = queue.pop(0)
-                beam[r, c] = dirty[r, c]
-                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    nr, nc = r + dr, c + dc
-                    if 0 <= nr < psf_size and 0 <= nc < psf_size and not visited[nr, nc]:
-                        visited[nr, nc] = True
-                        if np.abs(dirty[nr, nc]) < np.abs(dirty[r, c]) and np.abs(dirty[nr, nc]) > 0.1:
-                            queue.append((nr, nc))
-            return beam
 
         # Gaussian beam matched to -3dB resolution width
         dr_idx = np.arange(psf_size) - psf_size // 2
@@ -182,39 +247,3 @@ class PSFGenerator:
 
         beam = np.exp(-0.5 * ((U_prime / max(sigma_r, 1e-6))**2 + (V_prime / max(sigma_a, 1e-6))**2))
         return beam.astype(np.complex64)
-
-    def get_psfs_torch(
-        self,
-        row: int,
-        col: int,
-        psf_size: int = 65,
-        beam_type: str = "gaussian",
-        device: Optional[torch.device] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Retrieves exact local dirty PSF and clean beam as PyTorch tensors on target device,
-        utilizing a bounded LRU cache.
-        """
-        r_g, c_g = self.config.chip_to_global(float(row), float(col))
-        key = (int(r_g), int(c_g), psf_size, beam_type)
-
-        if key in self._cache_dirty and key in self._cache_clean:
-            self._cache_dirty.move_to_end(key)
-            self._cache_clean.move_to_end(key)
-            return self._cache_dirty[key], self._cache_clean[key]
-
-        # Compute exact dirty PSF & clean beam
-        dirty_np = self.compute_psf(row, col, psf_size=psf_size)
-        clean_np = self.compute_clean_beam(row, col, psf_size=psf_size, beam_type=beam_type)
-
-        dirty_t = torch.as_tensor(dirty_np, dtype=torch.complex64, device=device)
-        clean_t = torch.as_tensor(clean_np, dtype=torch.complex64, device=device)
-
-        if len(self._cache_dirty) >= self.max_cache_size:
-            self._cache_dirty.popitem(last=False)
-            self._cache_clean.popitem(last=False)
-
-        self._cache_dirty[key] = dirty_t
-        self._cache_clean[key] = clean_t
-
-        return dirty_t, clean_t
